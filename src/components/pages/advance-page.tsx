@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import {
   useFirestore,
   useCollection,
@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/table';
 import type { Staff, AdvancePayment } from '@/lib/definitions';
 import { UserSearch } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 export default function AdvancePage() {
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(
@@ -86,6 +87,27 @@ export default function AdvancePage() {
     }
     return 'Invalid Date';
   }
+
+  const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
+  const monthEndDate = endOfMonth(monthStartDate);
+  const daysInMonth = eachDayOfInterval({
+    start: monthStartDate,
+    end: monthEndDate,
+  });
+
+  const paymentsMap = React.useMemo(() => {
+    if (!payments) return new Map();
+    const map = new Map<string, AdvancePayment[]>();
+    payments.forEach((payment) => {
+      const paymentDate = payment.date instanceof Timestamp ? payment.date.toDate() : payment.date;
+      const dayKey = format(paymentDate, 'yyyy-MM-dd');
+      if (!map.has(dayKey)) {
+        map.set(dayKey, []);
+      }
+      map.get(dayKey)?.push(payment);
+    });
+    return map;
+  }, [payments]);
 
   return (
     <div className="grid grid-cols-1 gap-8">
@@ -177,18 +199,34 @@ export default function AdvancePage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : payments && payments.length > 0 ? (
-                payments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell>{formatDate(payment.date)}</TableCell>
-                    <TableCell className="text-right">
-                      {payment.amount.toLocaleString('en-US', {
-                        style: 'currency',
-                        currency: 'USD',
-                      })}
-                    </TableCell>
-                  </TableRow>
-                ))
+              ) : daysInMonth.length > 0 ? (
+                daysInMonth.map((day) => {
+                  const dayKey = format(day, 'yyyy-MM-dd');
+                  const dailyPayments = paymentsMap.get(dayKey);
+
+                  if (dailyPayments && dailyPayments.length > 0) {
+                     return dailyPayments.map((payment, index) => (
+                       <TableRow key={`${payment.id}-${index}`}>
+                         <TableCell>
+                           {index === 0 ? formatDate(day) : ''}
+                         </TableCell>
+                         <TableCell className="text-right">
+                           {payment.amount.toLocaleString('en-US', {
+                             style: 'currency',
+                             currency: 'USD',
+                           })}
+                         </TableCell>
+                       </TableRow>
+                     ));
+                  }
+                  
+                  return (
+                    <TableRow key={day.toISOString()}>
+                      <TableCell>{formatDate(day)}</TableCell>
+                      <TableCell className="text-right">-</TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={2} className="h-24 text-center">
