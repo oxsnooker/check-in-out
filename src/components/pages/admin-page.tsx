@@ -46,8 +46,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import type { Staff } from '@/lib/definitions';
 import { PlusCircle, Edit, Trash2, UserPlus } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection } from 'firebase/firestore';
+import { SimpleLogin } from '@/components/simple-login';
 
 function AddStaffSubmitButton() {
   const { pending } = useFormStatus();
@@ -72,6 +73,7 @@ export default function AdminPage() {
   const addFormRef = React.useRef<HTMLFormElement>(null);
   const editFormRef = React.useRef<HTMLFormElement>(null);
   const [isEditDialogOpen, setEditDialogOpen] = React.useState(false);
+  const { user, isUserLoading } = useUser();
   
   const addInitialState: State = { message: null, errors: {} };
   const [addState, addDispatch] = useActionState(addStaff, addInitialState);
@@ -80,7 +82,12 @@ export default function AdminPage() {
   const [updateState, updateDispatch] = useActionState(updateStaff, updateInitialState);
 
   const firestore = useFirestore();
-  const staffCollection = useMemoFirebase(() => collection(firestore, 'staff'), [firestore]);
+  
+  const staffCollection = useMemoFirebase(() => {
+    if (!user) return null;
+    return collection(firestore, 'staff');
+  }, [firestore, user]);
+
   const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
 
 
@@ -115,7 +122,8 @@ export default function AdminPage() {
     }
   }
 
-  if (isLoadingStaff) return <div>Loading...</div>;
+  if (isUserLoading || isLoadingStaff) return <SimpleLogin title="Admin Panel" description="Please sign in to manage staff." />;
+  if (!user) return <SimpleLogin title="Admin Panel" description="Please sign in to manage staff." />;
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">

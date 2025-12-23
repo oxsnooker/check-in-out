@@ -35,7 +35,8 @@ import {
 } from '@/components/ui/table';
 import type { Staff, AttendanceRecord } from '@/lib/definitions';
 import { Calendar, Check, Clock } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { SimpleLogin } from '@/components/simple-login';
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -56,12 +57,19 @@ export default function AttendancePage() {
 
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
 
+  const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
 
-  const staffCollection = useMemoFirebase(() => collection(firestore, 'staff'), [firestore]);
+  const staffCollection = useMemoFirebase(() => {
+    if (!user) return null;
+    return collection(firestore, 'staff');
+  }, [firestore, user]);
   const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
 
-  const attendanceCollectionGroup = useMemoFirebase(() => collectionGroup(firestore, 'attendance_records'), [firestore]);
+  const attendanceCollectionGroup = useMemoFirebase(() => {
+    if (!user) return null;
+    return collectionGroup(firestore, 'attendance_records');
+  }, [firestore, user]);
   const { data: initialRecords, isLoading: isLoadingRecords } = useCollection<AttendanceRecord>(attendanceCollectionGroup);
 
   React.useEffect(() => {
@@ -83,9 +91,14 @@ export default function AttendancePage() {
     }
   }, [state, toast]);
   
-  if (isLoadingStaff || isLoadingRecords || !staff || !initialRecords) {
-    return <div>Loading...</div>;
+  if (isUserLoading || isLoadingStaff || isLoadingRecords) {
+    return <SimpleLogin title="Attendance" description="Please sign in to manage attendance." />;
   }
+  
+  if (!user || !staff || !initialRecords) {
+     return <SimpleLogin title="Attendance" description="Please sign in to manage attendance." />;
+  }
+
 
   const filteredRecords = selectedStaffId
     ? initialRecords.filter((record) => record.staffId === selectedStaffId)

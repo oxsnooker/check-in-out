@@ -35,7 +35,8 @@ import {
 } from '@/components/ui/table';
 import type { Staff, AdvancePayment } from '@/lib/definitions';
 import { Calendar, DollarSign, Send } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { SimpleLogin } from '@/components/simple-login';
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -56,12 +57,19 @@ export default function AdvancePage() {
   
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
 
+  const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
 
-  const staffCollection = useMemoFirebase(() => collection(firestore, 'staff'), [firestore]);
+  const staffCollection = useMemoFirebase(() => {
+    if (!user) return null;
+    return collection(firestore, 'staff');
+  }, [firestore, user]);
   const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
 
-  const advancePaymentsCollectionGroup = useMemoFirebase(() => collectionGroup(firestore, 'advance_payments'), [firestore]);
+  const advancePaymentsCollectionGroup = useMemoFirebase(() => {
+    if (!user) return null;
+    return collectionGroup(firestore, 'advance_payments');
+  }, [firestore, user]);
   const { data: initialPayments, isLoading: isLoadingPayments } = useCollection<AdvancePayment>(advancePaymentsCollectionGroup);
 
   React.useEffect(() => {
@@ -76,8 +84,12 @@ export default function AdvancePage() {
     }
   }, [state, toast]);
 
-  if (isLoadingStaff || isLoadingPayments || !staff || !initialPayments) {
-    return <div>Loading...</div>;
+  if (isUserLoading || isLoadingStaff || isLoadingPayments) {
+    return <SimpleLogin title="Advance Payments" description="Please sign in to manage advance payments." />;
+  }
+  
+  if (!user || !staff || !initialPayments) {
+     return <SimpleLogin title="Advance Payments" description="Please sign in to manage advance payments." />;
   }
 
   const filteredPayments = selectedStaffId

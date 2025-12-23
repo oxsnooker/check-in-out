@@ -12,9 +12,10 @@ import {
 import { Label } from '@/components/ui/label';
 import type { Staff, AttendanceRecord, AdvancePayment } from '@/lib/definitions';
 import { DollarSign, Clock, Hourglass, CircleSlash } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, collectionGroup } from 'firebase/firestore';
 import { calculateWorkingHours } from '@/lib/utils';
+import { SimpleLogin } from '@/components/simple-login';
 
 interface SalaryData {
   staffId: string;
@@ -29,18 +30,32 @@ interface SalaryData {
 export default function SalaryPage() {
   const [selectedStaffId, setSelectedStaffId] = React.useState<string>('all');
   const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
 
-  const staffCollection = useMemoFirebase(() => collection(firestore, 'staff'), [firestore]);
+  const staffCollection = useMemoFirebase(() => {
+    if (!user) return null;
+    return collection(firestore, 'staff')
+  }, [firestore, user]);
   const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
   
-  const attendanceCollectionGroup = useMemoFirebase(() => collectionGroup(firestore, 'attendance_records'), [firestore]);
+  const attendanceCollectionGroup = useMemoFirebase(() => {
+    if (!user) return null;
+    return collectionGroup(firestore, 'attendance_records')
+  }, [firestore, user]);
   const { data: attendance, isLoading: isLoadingAttendance } = useCollection<AttendanceRecord>(attendanceCollectionGroup);
   
-  const advancePaymentsCollectionGroup = useMemoFirebase(() => collectionGroup(firestore, 'advance_payments'), [firestore]);
+  const advancePaymentsCollectionGroup = useMemoFirebase(() => {
+    if (!user) return null;
+    return collectionGroup(firestore, 'advance_payments')
+  }, [firestore, user]);
   const { data: advances, isLoading: isLoadingAdvances } = useCollection<AdvancePayment>(advancePaymentsCollectionGroup);
 
-  if (isLoadingStaff || isLoadingAttendance || isLoadingAdvances || !staff || !attendance || !advances) {
-    return <div>Loading...</div>;
+  if (isUserLoading || isLoadingStaff || isLoadingAttendance || isLoadingAdvances) {
+    return <SimpleLogin title="Salary Overview" description="Please sign in to view salaries." />;
+  }
+
+  if (!user || !staff || !attendance || !advances) {
+    return <SimpleLogin title="Salary Overview" description="Please sign in to view salaries." />;
   }
 
   const salaryData = staff.map(s => {
