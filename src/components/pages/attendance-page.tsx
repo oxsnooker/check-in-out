@@ -172,8 +172,8 @@ export default function AttendancePage({
                   filteredRecords.map((record) => (
                     <TableRow key={record.id}>
                       <TableCell>{staff.find((s) => s.id === record.staffId)?.name}</TableCell>
-                      <TableCell>{format(record.checkIn, 'MMM d, yyyy p')}</TableCell>
-                      <TableCell>{format(record.checkOut, 'MMM d, yyyy p')}</TableCell>
+                      <TableCell>{format(record.checkIn, 'MMM d, yyyy, hh:mm a')}</TableCell>
+                      <TableCell>{format(record.checkOut, 'MMM d, yyyy, hh:mm a')}</TableCell>
                     </TableRow>
                   ))
                 ) : (
