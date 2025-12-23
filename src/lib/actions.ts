@@ -14,7 +14,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 
 import type { Staff } from './definitions';
 import { v4 as uuidv4 } from 'uuid';
@@ -350,5 +350,37 @@ export async function signInWithEmail(prevState: State, formData: FormData) {
   return {
     message: 'Sign in must be handled on the client. This action is a placeholder.',
     errors: { email: ['Sign-in logic needs to be client-side.'] }
+  };
+}
+
+export async function verifyStaffPassword(prevState: State, formData: FormData) {
+  const validatedFields = FormSchema.pick({
+    email: true,
+    password: true,
+  }).safeParse({
+    email: formData.get('email'),
+    password: formData.get('password'),
+  });
+
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: 'Missing Fields. Failed to Verify.',
+    };
+  }
+
+  const { email, password } = validatedFields.data;
+
+  if (!email || !password) {
+    return { message: 'Email and password are required for verification.' };
+  }
+  
+  // This action is problematic because re-authentication is a client-side
+  // operation that requires an active user session.
+  // Server Actions run in a separate environment.
+  // We'll leave the logic here, but it needs to be called from a client component
+  // that can provide the currently authenticated user object.
+  return {
+    message: "This server action is a placeholder. The re-authentication logic must be handled on the client."
   };
 }
