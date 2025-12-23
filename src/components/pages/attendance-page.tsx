@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDate, isSameDay } from 'date-fns';
 import { Timestamp, collection, query, where } from 'firebase/firestore';
 
 import {
@@ -74,6 +74,21 @@ export default function AttendancePage() {
     label: format(new Date(0, i), 'MMMM'),
   }));
 
+  const year = new Date().getFullYear();
+  const monthStartDate = startOfMonth(new Date(year, selectedMonth));
+  const monthEndDate = endOfMonth(monthStartDate);
+  const daysInMonth = eachDayOfInterval({ start: monthStartDate, end: monthEndDate });
+
+  const attendanceMap = React.useMemo(() => {
+    if (!records) return new Map();
+    const map = new Map<number, AttendanceRecord>();
+    records.forEach(record => {
+      const dayOfMonth = getDate(toDate(record.checkIn));
+      map.set(dayOfMonth, record);
+    });
+    return map;
+  }, [records]);
+
 
   return (
     <div className="grid grid-cols-1 gap-8">
@@ -133,14 +148,17 @@ export default function AttendancePage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : records && records.length > 0 ? (
-                records.map((record) => (
-                  <TableRow key={record.id}>
-                    <TableCell>{format(toDate(record.checkIn), 'MMM d, yyyy')}</TableCell>
-                    <TableCell>{format(toDate(record.checkIn), 'hh:mm a')}</TableCell>
-                    <TableCell>{format(toDate(record.checkOut), 'hh:mm a')}</TableCell>
-                  </TableRow>
-                ))
+              ) : daysInMonth.length > 0 ? (
+                daysInMonth.map((day) => {
+                  const record = attendanceMap.get(getDate(day));
+                  return (
+                    <TableRow key={day.toISOString()}>
+                      <TableCell>{format(day, 'MMM d, yyyy')}</TableCell>
+                      <TableCell>{record ? format(toDate(record.checkIn), 'hh:mm a') : '—'}</TableCell>
+                      <TableCell>{record ? format(toDate(record.checkOut), 'hh:mm a') : '—'}</TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center">
