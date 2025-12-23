@@ -155,7 +155,7 @@ export default function SalaryPage() {
 
   let salaryData: SalaryData | null = null;
 
-  if (selectedStaffInfo && attendance && advances) {
+  if (verifiedStaffId && selectedStaffInfo && attendance && advances) {
     const totalHours = attendance.reduce((acc, record) => {
       const hours1 =
         record.checkIn && record.checkOut
@@ -177,7 +177,7 @@ export default function SalaryPage() {
     const balance = salaryAmount - totalAdvance;
 
     salaryData = {
-      staffId: verifiedStaffId!,
+      staffId: verifiedStaffId,
       staffName: selectedStaffInfo.name,
       totalHours,
       hourlyRate: selectedStaffInfo.hourlyRate,
@@ -188,7 +188,7 @@ export default function SalaryPage() {
   }
 
   const isLoadingData =
-    isLoadingAttendance || isLoadingAdvances;
+    (isLoadingAttendance || isLoadingAdvances) && !!verifiedStaffId;
 
   return (
     <div className="space-y-6">
@@ -257,7 +257,9 @@ export default function SalaryPage() {
       </Dialog>
 
       {isLoadingData ? (
-        verifiedStaffId && <p>Loading salary data...</p>
+        <div className="flex justify-center p-12">
+            <p>Loading salary data...</p>
+        </div>
       ) : salaryData ? (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           <Card key={salaryData.staffId} className="flex flex-col">
