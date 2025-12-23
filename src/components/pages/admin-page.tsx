@@ -46,6 +46,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import type { Staff } from '@/lib/definitions';
 import { PlusCircle, Edit, Trash2, UserPlus } from 'lucide-react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 function AddStaffSubmitButton() {
   const { pending } = useFormStatus();
@@ -65,7 +67,7 @@ function UpdateStaffSubmitButton() {
   );
 }
 
-export default function AdminPage({ staff }: { staff: Staff[] }) {
+export default function AdminPage() {
   const { toast } = useToast();
   const addFormRef = React.useRef<HTMLFormElement>(null);
   const editFormRef = React.useRef<HTMLFormElement>(null);
@@ -76,6 +78,11 @@ export default function AdminPage({ staff }: { staff: Staff[] }) {
 
   const updateInitialState: State = { message: null, errors: {} };
   const [updateState, updateDispatch] = useActionState(updateStaff, updateInitialState);
+
+  const firestore = useFirestore();
+  const staffCollection = useMemoFirebase(() => collection(firestore, 'staff'), [firestore]);
+  const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
+
 
   React.useEffect(() => {
     if (addState.message) {
@@ -107,6 +114,8 @@ export default function AdminPage({ staff }: { staff: Staff[] }) {
         toast({ title: 'Error', description: "Failed to delete staff member.", variant: 'destructive' });
     }
   }
+
+  if (isLoadingStaff) return <div>Loading...</div>;
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -155,7 +164,7 @@ export default function AdminPage({ staff }: { staff: Staff[] }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {staff.map((s) => (
+                {staff && staff.map((s) => (
                   <TableRow key={s.id}>
                     <TableCell>{s.name}</TableCell>
                     <TableCell>{s.hourlyRate.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>

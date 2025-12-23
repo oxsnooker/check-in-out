@@ -10,8 +10,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import type { Staff } from '@/lib/definitions';
+import type { Staff, AttendanceRecord, AdvancePayment } from '@/lib/definitions';
 import { DollarSign, Clock, Hourglass, CircleSlash } from 'lucide-react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, collectionGroup } from 'firebase/firestore';
+import { calculateWorkingHours } from '@/lib/utils';
 
 interface SalaryData {
   staffId: string;
@@ -23,8 +26,46 @@ interface SalaryData {
   balance: number;
 }
 
-export default function SalaryPage({ salaryData, staff }: { salaryData: SalaryData[]; staff: Staff[] }) {
+export default function SalaryPage() {
   const [selectedStaffId, setSelectedStaffId] = React.useState<string>('all');
+  const firestore = useFirestore();
+
+  const staffCollection = useMemoFirebase(() => collection(firestore, 'staff'), [firestore]);
+  const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
+  
+  const attendanceCollectionGroup = useMemoFirebase(() => collectionGroup(firestore, 'attendance_records'), [firestore]);
+  const { data: attendance, isLoading: isLoadingAttendance } = useCollection<AttendanceRecord>(attendanceCollectionGroup);
+  
+  const advancePaymentsCollectionGroup = useMemoFirebase(() => collectionGroup(firestore, 'advance_payments'), [firestore]);
+  const { data: advances, isLoading: isLoadingAdvances } = useCollection<AdvancePayment>(advancePaymentsCollectionGroup);
+
+  if (isLoadingStaff || isLoadingAttendance || isLoadingAdvances || !staff || !attendance || !advances) {
+    return <div>Loading...</div>;
+  }
+
+  const salaryData = staff.map(s => {
+    const staffAttendance = attendance.filter(a => a.staffId === s.id);
+    const staffAdvances = advances.filter(a => a.staffId === s.id);
+
+    const totalHours = staffAttendance.reduce((acc, record) => {
+      return acc + calculateWorkingHours(record.checkIn, record.checkOut);
+    }, 0);
+
+    const totalAdvance = staffAdvances.reduce((acc, payment) => acc + payment.amount, 0);
+
+    const salaryAmount = totalHours * s.hourlyRate;
+    const balance = salaryAmount - totalAdvance;
+
+    return {
+      staffId: s.id,
+      staffName: s.name,
+      totalHours,
+      hourlyRate: s.hourlyRate,
+      salaryAmount,
+      totalAdvance,
+      balance,
+    };
+  });
 
   const filteredData =
     selectedStaffId === 'all'

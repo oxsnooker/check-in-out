@@ -6,6 +6,7 @@ import { useFormStatus } from 'react-dom';
 import { addAdvance, type State } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { Timestamp, collection, collectionGroup } from 'firebase/firestore';
 
 import {
   Card,
@@ -34,6 +35,7 @@ import {
 } from '@/components/ui/table';
 import type { Staff, AdvancePayment } from '@/lib/definitions';
 import { Calendar, DollarSign, Send } from 'lucide-react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -45,13 +47,7 @@ function SubmitButton() {
   );
 }
 
-export default function AdvancePage({
-  staff,
-  initialPayments,
-}: {
-  staff: Staff[];
-  initialPayments: AdvancePayment[];
-}) {
+export default function AdvancePage() {
   const { toast } = useToast();
   const formRef = React.useRef<HTMLFormElement>(null);
   
@@ -59,6 +55,14 @@ export default function AdvancePage({
   const [state, dispatch] = useActionState(addAdvance, initialState);
   
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
+
+  const firestore = useFirestore();
+
+  const staffCollection = useMemoFirebase(() => collection(firestore, 'staff'), [firestore]);
+  const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
+
+  const advancePaymentsCollectionGroup = useMemoFirebase(() => collectionGroup(firestore, 'advance_payments'), [firestore]);
+  const { data: initialPayments, isLoading: isLoadingPayments } = useCollection<AdvancePayment>(advancePaymentsCollectionGroup);
 
   React.useEffect(() => {
     if (state.message) {
@@ -72,9 +76,15 @@ export default function AdvancePage({
     }
   }, [state, toast]);
 
+  if (isLoadingStaff || isLoadingPayments || !staff || !initialPayments) {
+    return <div>Loading...</div>;
+  }
+
   const filteredPayments = selectedStaffId
     ? initialPayments.filter((p) => p.staffId === selectedStaffId)
     : initialPayments;
+
+  const toDate = (date: Date | Timestamp) => (date instanceof Timestamp ? date.toDate() : date);
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -151,7 +161,7 @@ export default function AdvancePage({
                   filteredPayments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell>{staff.find((s) => s.id === payment.staffId)?.name}</TableCell>
-                      <TableCell>{format(payment.date, 'MMM d, yyyy')}</TableCell>
+                      <TableCell>{format(toDate(payment.date), 'MMM d, yyyy')}</TableCell>
                       <TableCell className="text-right">
                         {payment.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                       </TableCell>

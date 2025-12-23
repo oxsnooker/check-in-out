@@ -1,20 +1,25 @@
+import { Timestamp } from "firebase/firestore";
+
 export interface Staff {
   id: string;
   name: string;
   hourlyRate: number;
-  password?: string;
+  email?: string;
+  // Password is not stored in Firestore document
 }
 
 export interface AttendanceRecord {
   id: string;
   staffId: string;
-  checkIn: Date;
-  checkOut: Date;
+  checkIn: Date | Timestamp;
+  checkOut: Date | Timestamp;
+  createdAt?: Date | Timestamp;
 }
 
 export interface AdvancePayment {
   id: string;
   staffId: string;
   amount: number;
-  date: Date;
+  date: Date | Timestamp;
+  createdAt?: Date | Timestamp;
 }

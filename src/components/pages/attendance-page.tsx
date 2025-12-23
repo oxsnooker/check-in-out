@@ -6,6 +6,7 @@ import { useFormStatus } from 'react-dom';
 import { addAttendance, type State } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { Timestamp, collection, collectionGroup } from 'firebase/firestore';
 
 import {
   Card,
@@ -34,6 +35,7 @@ import {
 } from '@/components/ui/table';
 import type { Staff, AttendanceRecord } from '@/lib/definitions';
 import { Calendar, Check, Clock } from 'lucide-react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -45,13 +47,7 @@ function SubmitButton() {
   );
 }
 
-export default function AttendancePage({
-  staff,
-  initialRecords,
-}: {
-  staff: Staff[];
-  initialRecords: AttendanceRecord[];
-}) {
+export default function AttendancePage() {
   const { toast } = useToast();
   const formRef = React.useRef<HTMLFormElement>(null);
 
@@ -59,6 +55,14 @@ export default function AttendancePage({
   const [state, dispatch] = useActionState(addAttendance, initialState);
 
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
+
+  const firestore = useFirestore();
+
+  const staffCollection = useMemoFirebase(() => collection(firestore, 'staff'), [firestore]);
+  const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
+
+  const attendanceCollectionGroup = useMemoFirebase(() => collectionGroup(firestore, 'attendance_records'), [firestore]);
+  const { data: initialRecords, isLoading: isLoadingRecords } = useCollection<AttendanceRecord>(attendanceCollectionGroup);
 
   React.useEffect(() => {
     if (state.message) {
@@ -78,10 +82,17 @@ export default function AttendancePage({
       }
     }
   }, [state, toast]);
+  
+  if (isLoadingStaff || isLoadingRecords || !staff || !initialRecords) {
+    return <div>Loading...</div>;
+  }
 
   const filteredRecords = selectedStaffId
     ? initialRecords.filter((record) => record.staffId === selectedStaffId)
     : initialRecords;
+
+  const toDate = (date: Date | Timestamp) => (date instanceof Timestamp ? date.toDate() : date);
+
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -173,8 +184,8 @@ export default function AttendancePage({
                   filteredRecords.map((record) => (
                     <TableRow key={record.id}>
                       <TableCell>{staff.find((s) => s.id === record.staffId)?.name}</TableCell>
-                      <TableCell>{format(record.checkIn, 'MMM d, yyyy, hh:mm a')}</TableCell>
-                      <TableCell>{format(record.checkOut, 'MMM d, yyyy, hh:mm a')}</TableCell>
+                      <TableCell>{format(toDate(record.checkIn), 'MMM d, yyyy, hh:mm a')}</TableCell>
+                      <TableCell>{format(toDate(record.checkOut), 'MMM d, yyyy, hh:mm a')}</TableCell>
                     </TableRow>
                   ))
                 ) : (
