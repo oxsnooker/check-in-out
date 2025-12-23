@@ -1,3 +1,5 @@
+'use client';
+
 import { SidebarTrigger } from './ui/sidebar';
 import { UserNav } from './user-nav';
 import { useUser } from '@/firebase';
