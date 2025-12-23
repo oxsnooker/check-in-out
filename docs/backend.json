@@ -1,7 +1,170 @@
 {
-  "entities": {},
-  "auth": {
-    "providers": []
+  "entities": {
+    "Staff": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Staff",
+      "type": "object",
+      "description": "Represents an employee of the company.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Staff entity."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "First name of the staff member."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name of the staff member."
+        },
+        "hourlyRate": {
+          "type": "number",
+          "description": "The staff member's fixed salary per hour."
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "hourlyRate"
+      ]
+    },
+    "AttendanceRecord": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AttendanceRecord",
+      "type": "object",
+      "description": "Represents a single attendance record for a staff member.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the AttendanceRecord entity."
+        },
+        "staffId": {
+          "type": "string",
+          "description": "Reference to Staff. (Relationship: Staff 1:N AttendanceRecord)"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the attendance record.",
+          "format": "date-time"
+        },
+        "timeIn": {
+          "type": "string",
+          "description": "Time the staff member clocked in.",
+          "format": "date-time"
+        },
+        "timeOut": {
+          "type": "string",
+          "description": "Time the staff member clocked out.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "staffId",
+        "date",
+        "timeIn",
+        "timeOut"
+      ]
+    },
+    "AdvancePayment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AdvancePayment",
+      "type": "object",
+      "description": "Represents an advance payment made to a staff member.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the AdvancePayment entity."
+        },
+        "staffId": {
+          "type": "string",
+          "description": "Reference to Staff. (Relationship: Staff 1:N AdvancePayment)"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the advance payment.",
+          "format": "date-time"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount of the advance payment."
+        }
+      },
+      "required": [
+        "id",
+        "staffId",
+        "date",
+        "amount"
+      ]
+    }
   },
-  "firestore": {}
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/staff/{staffId}",
+        "definition": {
+          "entityName": "Staff",
+          "schema": {
+            "$ref": "#/backend/entities/Staff"
+          },
+          "description": "Stores staff member information.  Allows admins to create, read, update, and delete staff records.",
+          "params": [
+            {
+              "name": "staffId",
+              "description": "The unique identifier of the staff member."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/staff/{staffId}/attendance_records/{attendanceRecordId}",
+        "definition": {
+          "entityName": "AttendanceRecord",
+          "schema": {
+            "$ref": "#/backend/entities/AttendanceRecord"
+          },
+          "description": "Stores attendance records for each staff member.  Allows admins to create, read, update, and delete attendance records.",
+          "params": [
+            {
+              "name": "staffId",
+              "description": "The unique identifier of the staff member."
+            },
+            {
+              "name": "attendanceRecordId",
+              "description": "The unique identifier of the attendance record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/staff/{staffId}/advance_payments/{advancePaymentId}",
+        "definition": {
+          "entityName": "AdvancePayment",
+          "schema": {
+            "$ref": "#/backend/entities/AdvancePayment"
+          },
+          "description": "Stores advance payment records for each staff member.  Allows admins to create, read, update, and delete advance payment records.",
+          "params": [
+            {
+              "name": "staffId",
+              "description": "The unique identifier of the staff member."
+            },
+            {
+              "name": "advancePaymentId",
+              "description": "The unique identifier of the advance payment record."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support the TimeTrack Pro application, focusing on attendance tracking, advance payments, and staff management. It follows the principles of Authorization Independence, Structural Segregation, and Access Modeling to ensure security and scalability.\n\nAuthorization Independence is achieved by storing all authorization-relevant data directly within the documents that require access control.  Specifically, since all of the data is only visible to admin, all the collections and subcollection will be stored in a path that allows admin authorization. This avoids the need for `get()` calls in the security rules, enabling atomic operations and simplifying debugging. Since there are no users, there will not be a `members` map for collaborative entities. Thus, admin writes to all the paths.\n\nStructural Segregation is implemented by separating the different types of data into distinct collections: `/staff`, `/staff/{staffId}/attendance_records`, and `/staff/{staffId}/advance_payments`. This segregation ensures that each collection has a homogeneous security posture, simplifying the security rules.\n\nAccess Modeling employs hierarchical paths for user-owned data. Since there are staff members and their attendance records and advance payments, there will be path-based ownership like `/staff/{staffId}/attendance_records/{attendanceRecordId}` and `/staff/{staffId}/advance_payments/{advancePaymentId}`. This structure is highly secure and makes ownership-based security rules simple and efficient.\n\nQAPs (Rules are not Filters) are supported by the structural segregation and authorization independence. `list` operations are secured by enforcing that only admins can read and write data. Because authorization data is denormalized, rules can validate access without additional `get()` calls, preventing rule-based filtering."
+  }
 }

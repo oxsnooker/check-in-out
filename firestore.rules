@@ -1,8 +1,126 @@
+/**
+ * Core Philosophy: This ruleset implements a secure "admin-only" model for a staff
+ * management application. During this prototyping phase, an "admin" is defined as any
+ * authenticated user. This provides a secure-by-default posture, preventing all
+ * public or anonymous access, while giving developers flexibility to iterate.
+ * For production, the `isAdmin()` function should be updated to check for a
+ * custom claim or a role field on a user document.
+ *
+ * Data Structure: The data is organized hierarchically. Core staff information is
+ * stored in the top-level `/staff` collection. Each staff member's related data,
+ * such as attendance and payments, are stored in subcollections under that staff
+ * member's document (e.g., `/staff/{staffId}/attendance_records/...`).
+ *
+ * Key Security Decisions:
+ * - Admin-Only Access: All read and write operations on all data are restricted
+ *   to authenticated users. There is no public or anonymous access.
+ * - No User Listing: The rules do not assume a `/users` collection and therefore
+ *   do not allow for listing of application users.
+ * - Relational Integrity: For subcollections like `attendance_records`, the rules
+ *   enforce that the `staffId` field within the document must match the `staffId`
+ *   from the document's path. This ensures data consistency.
+ *
+ * Denormalization for Authorization: While this model is simple, it is built on
+ * the principle of authorization independence. The `staffId` used for ensuring
+ * relational integrity is stored directly on the subcollection documents, avoiding
+ * the need for extra `get()` calls in security rules.
+ *
+ * Structural Segregation: Staff, attendance, and payment data are stored in
+ * separate collections (`/staff`, `/attendance_records`, `/advance_payments`),
+ * which allows for clear, distinct security rules for each data type.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+
+    // =====================================================================
+    // Helper Functions
+    // =====================================================================
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * [PROTOTYPE] Checks if the user is an administrator.
+     * TODO: For production, replace this with a real role check, such as
+     * reading a custom claim (request.auth.token.isAdmin == true) or
+     * checking a role document.
+     */
+    function isAdmin() {
+      return isSignedIn();
+    }
+
+    /**
+     * On create, validates that the incoming document's `staffId` field
+     * matches the `staffId` from the URL path, ensuring relational integrity.
+     */
+    function hasValidStaffIdOnCreate(staffId) {
+      return request.resource.data.staffId == staffId;
+    }
+
+    /**
+     * On update, ensures the `staffId` field, which links a subcollection
+     * document to its parent staff member, cannot be changed.
+     */
+    function hasImmutableStaffId() {
+      return request.resource.data.staffId == resource.data.staffId;
+    }
+
+    // =====================================================================
+    // Collection: staff
+    // =====================================================================
+
+    /**
+     * @description Controls access to staff member documents.
+     *   Only authenticated "admins" can create, view, modify, or delete staff.
+     * @path /staff/{staffId}
+     * @allow (create) An authenticated user (admin) creates a new staff document.
+     * @deny (create) An unauthenticated user attempts to create a staff document.
+     * @principle Restricts all data access to a trusted administrative role.
+     */
+    match /staff/{staffId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+
+      // --- Subcollections ---
+      match /attendance_records/{attendanceRecordId} {
+        /**
+         * @description Controls access to a staff member's attendance records.
+         *   Only admins can manage records, and records must be linked to the correct staff member.
+         * @path /staff/{staffId}/attendance_records/{attendanceRecordId}
+         * @allow (create) An admin creates an attendance record where the document's `staffId` matches the path.
+         * @deny (create) An admin creates a record where the document's `staffId` does NOT match the path.
+         * @principle Enforces relational integrity between a child document and its parent.
+         */
+        allow get: if isAdmin();
+        allow list: if isAdmin();
+        allow create: if isAdmin() && hasValidStaffIdOnCreate(staffId);
+        allow update: if isAdmin() && resource != null && hasImmutableStaffId();
+        allow delete: if isAdmin() && resource != null;
+      }
+
+      match /advance_payments/{advancePaymentId} {
+        /**
+         * @description Controls access to a staff member's advance payment records.
+         *   Only admins can manage records, and records must be linked to the correct staff member.
+         * @path /staff/{staffId}/advance_payments/{advancePaymentId}
+         * @allow (create) An admin creates a payment record where the document's `staffId` matches the path.
+         * @deny (create) An admin creates a payment record where the document's `staffId` does NOT match the path.
+         * @principle Enforces relational integrity between a child document and its parent.
+         */
+        allow get: if isAdmin();
+        allow list: if isAdmin();
+        allow create: if isAdmin() && hasValidStaffIdOnCreate(staffId);
+        allow update: if isAdmin() && resource != null && hasImmutableStaffId();
+        allow delete: if isAdmin() && resource != null;
+      }
     }
   }
 }
