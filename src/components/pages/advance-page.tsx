@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import {
   useFirestore,
   useCollection,
@@ -38,6 +38,13 @@ export default function AdvancePage() {
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(
     null
   );
+  const [selectedMonth, setSelectedMonth] = React.useState<number>(
+    new Date().getMonth()
+  );
+  const [selectedYear, setSelectedYear] = React.useState<number>(
+    new Date().getFullYear()
+  );
+
   const firestore = useFirestore();
 
   const staffCollection = useMemoFirebase(
@@ -48,16 +55,28 @@ export default function AdvancePage() {
 
   const paymentsQuery = useMemoFirebase(() => {
     if (!firestore || !selectedStaffId) return null;
+    const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
+    const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
     return query(
       collection(firestore, `staff/${selectedStaffId}/advance_payments`),
-      where('staffId', '==', selectedStaffId)
+      where('staffId', '==', selectedStaffId),
+      where('date', '>=', startDate),
+      where('date', '<=', endDate)
     );
-  }, [firestore, selectedStaffId]);
+  }, [firestore, selectedStaffId, selectedMonth, selectedYear]);
 
   const {
     data: payments,
     isLoading: isLoadingPayments,
   } = useCollection<AdvancePayment>(paymentsQuery);
+
+  const monthOptions = Array.from({ length: 12 }, (_, i) => ({
+    value: i,
+    label: format(new Date(0, i), 'MMMM'),
+  }));
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
   const getStaffName = (staffId: string) => {
     return staff?.find((s) => s.id === staffId)?.name || 'Unknown Staff';
@@ -103,6 +122,36 @@ export default function AdvancePage() {
                       {s.name}
                     </SelectItem>
                   ))}
+              </SelectContent>
+            </Select>
+             <Select
+              onValueChange={(value) => setSelectedMonth(Number(value))}
+              value={String(selectedMonth)}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Select month" />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map((month) => (
+                  <SelectItem key={month.value} value={String(month.value)}>
+                    {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              onValueChange={(value) => setSelectedYear(Number(value))}
+              value={String(selectedYear)}
+            >
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Select year" />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((year) => (
+                  <SelectItem key={year} value={String(year)}>
+                    {year}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
