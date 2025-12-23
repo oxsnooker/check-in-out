@@ -1,9 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { signInWithEmail, type State } from '@/lib/actions';
 import { Button } from './ui/button';
 import {
   Card,
@@ -17,6 +15,8 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 function LoginSubmitButton() {
   const { pending } = useFormStatus();
@@ -35,58 +35,83 @@ interface SimpleLoginProps {
 
 export function SimpleLogin({ title, description }: SimpleLoginProps) {
   const { toast } = useToast();
-  const initialState: State = { message: null, errors: {} };
-  const [state, dispatch] = useActionState(signInWithEmail, initialState);
+  const auth = useAuth();
 
-  React.useEffect(() => {
-    if (state?.message) {
-       if (state.errors && Object.keys(state.errors).length > 0) {
-        toast({
-            title: 'Sign In Error',
-            description: state.message,
-            variant: 'destructive',
-        });
-       }
+  const handleSignIn = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+
+    if (!email || !password) {
+      toast({
+        title: 'Sign In Error',
+        description: 'Email and password are required.',
+        variant: 'destructive',
+      });
+      return;
     }
-  }, [state, toast]);
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // Auth state change will be handled by the useUser hook
+      // and AuthGate component. No need to redirect here.
+       toast({
+            title: 'Sign In Successful',
+            description: "You're now logged in.",
+        });
+    } catch (error: any) {
+      let errorMessage = 'An unknown error occurred.';
+      switch (error.code) {
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+        case 'auth/invalid-credential':
+          errorMessage = 'Invalid email or password. Please try again.';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Please enter a valid email address.';
+          break;
+        default:
+          errorMessage = error.message;
+          break;
+      }
+      toast({
+        title: 'Sign In Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    }
+  };
 
   return (
-    <Card className="mx-auto mt-12 max-w-sm">
-      <form action={dispatch}>
-        <CardHeader className="text-center">
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="staff@example.com"
-              required
-            />
-            {state?.errors?.email && (
-              <p className="text-sm font-medium text-destructive">
-                {state.errors.email}
-              </p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input id="password" name="password" type="password" required />
-            {state?.errors?.password && (
-              <p className="text-sm font-medium text-destructive">
-                {state.errors.password}
-              </p>
-            )}
-          </div>
-        </CardContent>
-        <CardFooter>
-          <LoginSubmitButton />
-        </CardFooter>
-      </form>
-    </Card>
+    <div className="flex h-screen items-center justify-center bg-background">
+      <Card className="mx-auto max-w-sm">
+        <form onSubmit={handleSignIn}>
+          <CardHeader className="text-center">
+            <CardTitle>{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="staff@example.com"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" name="password" type="password" required />
+            </div>
+          </CardContent>
+          <CardFooter>
+            <LoginSubmitButton />
+          </CardFooter>
+        </form>
+      </Card>
+    </div>
   );
 }

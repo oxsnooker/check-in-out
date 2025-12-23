@@ -14,6 +14,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 import type { Staff } from './definitions';
 import { v4 as uuidv4 } from 'uuid';
@@ -62,7 +63,7 @@ const UpdateStaff = FormSchema.pick({
   hourlyRate: true,
   password: true,
 });
-
+const SignIn = FormSchema.pick({ email: true, password: true });
 
 export type State = {
   errors?: {
@@ -205,22 +206,37 @@ export async function addStaff(prevState: State, formData: FormData) {
     };
   }
 
-  const { name, email, hourlyRate } = validatedFields.data;
+  const { name, email, hourlyRate, password } = validatedFields.data;
+  
+  if (!password) {
+    return {
+      errors: { password: ['Password is required.'] },
+      message: 'Missing Fields. Failed to Add Staff.',
+    };
+  }
 
-  const { firestore } = initializeFirebase();
+  const { firestore, auth } = initializeFirebase();
 
   try {
+    // We do not create the user with email and password here.
+    // That should be done through the Firebase Admin SDK in a secure environment,
+    // or through the client-side authentication flow.
+    // This action will just store the staff details in Firestore.
+
     const staffId = uuidv4();
     await setDoc(doc(firestore, 'staff', staffId), {
       id: staffId,
       name,
+      email,
       hourlyRate,
-      email: email,
     });
 
     revalidatePath('/admin');
     return { message: 'Staff member added successfully.' };
   } catch (e: any) {
+    if (e.code === 'auth/email-already-in-use') {
+        return { message: 'This email is already in use.' };
+    }
     return {
       message: `Database Error: Failed to add staff member. ${e.message}`,
     };
@@ -302,4 +318,37 @@ export async function deleteStaff(staffId: string) {
     console.error("Failed to delete staff member:", error);
     return { message: 'Database Error: Failed to Delete Staff Member.' };
   }
+}
+
+export async function signInWithEmail(prevState: State, formData: FormData) {
+  const validatedFields = SignIn.safeParse({
+    email: formData.get('email'),
+    password: formData.get('password'),
+  });
+
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: 'Missing Fields. Failed to Sign In.',
+    };
+  }
+  const { email, password } = validatedFields.data;
+
+  if (!email || !password) {
+      return { message: 'Email and password are required.' };
+  }
+
+  // This is a server action, but signInWithEmailAndPassword should be called on the client
+  // to get the auth state. We'll return the credentials and let the client handle it.
+  // This is not ideal, but for the purpose of this example, we proceed.
+  // A better approach would be to use a client-side function to call Firebase Auth.
+  
+  // The following code will not work as intended in a Server Action because
+  // Firebase Auth is designed for the client.
+  // We are returning an error to indicate this.
+
+  return {
+    message: 'Sign in must be handled on the client. This action is a placeholder.',
+    errors: { email: ['Sign-in logic needs to be client-side.'] }
+  };
 }

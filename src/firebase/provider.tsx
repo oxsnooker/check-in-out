@@ -3,7 +3,7 @@
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { Auth, User } from 'firebase/auth';
+import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 
 interface FirebaseProviderProps {
@@ -13,44 +13,52 @@ interface FirebaseProviderProps {
   auth: Auth;
 }
 
-// UserAuthState is no longer needed as we are not tracking auth state
-// interface UserAuthState { ... }
-
-// Combined state for the Firebase context
-export interface FirebaseContextState {
-  areServicesAvailable: boolean; // True if core services (app, firestore, auth instance) are provided
-  firebaseApp: FirebaseApp | null;
-  firestore: Firestore | null;
-  auth: Auth | null; // The Auth service instance
-  // User auth state is removed
+interface UserAuthState {
+  user: User | null;
+  isLoading: boolean;
 }
 
-// Return type for useFirebase()
+export interface FirebaseContextState {
+  areServicesAvailable: boolean; 
+  firebaseApp: FirebaseApp | null;
+  firestore: Firestore | null;
+  auth: Auth | null; 
+  userAuthState: UserAuthState;
+}
+
 export interface FirebaseServices {
   firebaseApp: FirebaseApp;
   firestore: Firestore;
   auth: Auth;
 }
 
-// UserHookResult is no longer needed
-// export interface UserHookResult { ... }
+export interface UserHookResult {
+  user: User | null;
+  isLoading: boolean;
+}
 
-// React Context
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
-/**
- * FirebaseProvider manages and provides Firebase services.
- * User authentication state management has been removed.
- */
+
 export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   children,
   firebaseApp,
   firestore,
   auth,
 }) => {
-  // Effect to subscribe to Firebase auth state changes is removed
+  const [userAuthState, setUserAuthState] = useState<UserAuthState>({
+    user: null,
+    isLoading: true,
+  });
 
-  // Memoize the context value
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUserAuthState({ user, isLoading: false });
+    });
+    return () => unsubscribe();
+  }, [auth]);
+
+
   const contextValue = useMemo((): FirebaseContextState => {
     const servicesAvailable = !!(firebaseApp && firestore && auth);
     return {
@@ -58,8 +66,9 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       firebaseApp: servicesAvailable ? firebaseApp : null,
       firestore: servicesAvailable ? firestore : null,
       auth: servicesAvailable ? auth : null,
+      userAuthState: userAuthState,
     };
-  }, [firebaseApp, firestore, auth]);
+  }, [firebaseApp, firestore, auth, userAuthState]);
 
   return (
     <FirebaseContext.Provider value={contextValue}>
@@ -69,10 +78,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   );
 };
 
-/**
- * Hook to access core Firebase services.
- * Throws error if core services are not available or used outside provider.
- */
 export const useFirebase = (): FirebaseServices => {
   const context = useContext(FirebaseContext);
 
@@ -91,19 +96,16 @@ export const useFirebase = (): FirebaseServices => {
   };
 };
 
-/** Hook to access Firebase Auth instance. */
 export const useAuth = (): Auth => {
   const { auth } = useFirebase();
   return auth;
 };
 
-/** Hook to access Firestore instance. */
 export const useFirestore = (): Firestore => {
   const { firestore } = useFirebase();
   return firestore;
 };
 
-/** Hook to access Firebase App instance. */
 export const useFirebaseApp = (): FirebaseApp => {
   const { firebaseApp } = useFirebase();
   return firebaseApp;
@@ -119,5 +121,3 @@ export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | 
   
   return memoized;
 }
-
-// useUser hook is removed as it's no longer needed.

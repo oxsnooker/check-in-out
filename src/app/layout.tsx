@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
-import { MainLayout } from '@/components/main-layout';
 import { FirebaseClientProvider } from '@/firebase';
+import { AuthGate } from '@/components/auth-gate';
 
 export const metadata: Metadata = {
   title: 'TimeTrack Pro',
@@ -26,7 +26,7 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <FirebaseClientProvider>
-          <MainLayout>{children}</MainLayout>
+          <AuthGate>{children}</AuthGate>
         </FirebaseClientProvider>
         <Toaster />
       </body>
