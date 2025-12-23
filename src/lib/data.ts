@@ -10,19 +10,19 @@ let attendanceRecords: AttendanceRecord[] = [
   {
     id: '1',
     staffId: '1',
-    checkIn: new Date(new Date().setDate(new Date().getDate() - 1)),
-    checkOut: new Date(new Date(new Date().setDate(new Date().getDate() - 1)).setHours(17)),
+    checkIn: new Date('2024-07-20T09:00:00'),
+    checkOut: new Date('2024-07-20T17:00:00'),
   },
   {
     id: '2',
     staffId: '2',
-    checkIn: new Date(new Date().setDate(new Date().getDate() - 1)),
-    checkOut: new Date(new Date(new Date().setDate(new Date().getDate() - 1)).setHours(18)),
+    checkIn: new Date('2024-07-20T08:30:00'),
+    checkOut: new Date('2024-07-20T18:00:00'),
   },
 ];
 
 let advancePayments: AdvancePayment[] = [
-  { id: '1', staffId: '1', amount: 200, date: new Date(new Date().setDate(15)) },
+  { id: '1', staffId: '1', amount: 200, date: new Date('2024-07-15T00:00:00') },
 ];
 
 // Simulate API latency
