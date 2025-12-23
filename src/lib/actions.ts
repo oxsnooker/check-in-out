@@ -15,6 +15,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updatePassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
@@ -85,6 +87,40 @@ export type State = {
   message?: string | null;
 };
 
+export async function verifyStaffPassword(prevState: State, formData: FormData) {
+    const validatedFields = SignIn.safeParse({
+        email: formData.get('email'),
+        password: formData.get('password'),
+    });
+
+    if (!validatedFields.success) {
+        return {
+            errors: validatedFields.error.flatten().fieldErrors,
+            message: 'Invalid fields. Failed to verify.',
+        }
+    }
+    
+    const { email, password } = validatedFields.data;
+    const { auth } = initializeFirebase();
+
+    // We can't directly verify a password for another user on the client.
+    // A secure way would be a custom backend function.
+    // As a workaround, we'll try to sign in with the credentials. This is NOT ideal
+    // as it might sign out the current admin user if successful.
+    // A better approach would require a backend (e.g. Cloud Function).
+    try {
+        // This is a temporary verification method.
+        await signInWithEmailAndPassword(auth, email!, password);
+        return { message: 'Verification successful.' };
+    } catch (e: any) {
+         return {
+            errors: { password: ['Invalid password.'] },
+            message: `Verification failed.`,
+        }
+    }
+}
+
+
 export async function signInWithEmail(prevState: State, formData: FormData) {
     const validatedFields = SignIn.safeParse({
         email: formData.get('email'),
@@ -103,8 +139,6 @@ export async function signInWithEmail(prevState: State, formData: FormData) {
 
     try {
         await signInWithEmailAndPassword(auth, email!, password);
-        // Revalidation might not be necessary as onAuthStateChanged handles UI updates
-        // but can be useful if there are server-rendered parts that need to change.
         revalidatePath('/');
         return { message: 'Sign in successful.' };
     } catch(e: any) {
