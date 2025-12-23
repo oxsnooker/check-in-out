@@ -6,7 +6,7 @@ import { useFormStatus } from 'react-dom';
 import { addAttendance, type State } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { Timestamp, collection, collectionGroup } from 'firebase/firestore';
+import { Timestamp, collection, query, where } from 'firebase/firestore';
 
 import {
   Card,
@@ -34,7 +34,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { Staff, AttendanceRecord } from '@/lib/definitions';
-import { Calendar, Check, Clock } from 'lucide-react';
+import { Calendar, Check, Clock, UserSearch } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { SimpleLogin } from '@/components/simple-login';
 
@@ -66,11 +66,12 @@ export default function AttendancePage() {
   }, [firestore, user]);
   const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
 
-  const attendanceCollectionGroup = useMemoFirebase(() => {
-    if (!user) return null;
-    return collectionGroup(firestore, 'attendance_records');
-  }, [firestore, user]);
-  const { data: initialRecords, isLoading: isLoadingRecords } = useCollection<AttendanceRecord>(attendanceCollectionGroup);
+  const attendanceCollection = useMemoFirebase(() => {
+    if (!user || !selectedStaffId) return null;
+    return query(collection(firestore, `staff/${selectedStaffId}/attendance_records`));
+  }, [firestore, user, selectedStaffId]);
+  const { data: records, isLoading: isLoadingRecords } = useCollection<AttendanceRecord>(attendanceCollection);
+
 
   React.useEffect(() => {
     if (state.message) {
@@ -86,23 +87,18 @@ export default function AttendancePage() {
           description: state.message,
         });
         formRef.current?.reset();
-        setSelectedStaffId(null);
+        // Keep selected staff ID
       }
     }
   }, [state, toast]);
   
-  if (isUserLoading || isLoadingStaff || isLoadingRecords) {
+  if (isUserLoading || isLoadingStaff) {
     return <SimpleLogin title="Attendance" description="Please sign in to manage attendance." />;
   }
   
-  if (!user || !staff || !initialRecords) {
+  if (!user || !staff) {
      return <SimpleLogin title="Attendance" description="Please sign in to manage attendance." />;
   }
-
-
-  const filteredRecords = selectedStaffId
-    ? initialRecords.filter((record) => record.staffId === selectedStaffId)
-    : initialRecords;
 
   const toDate = (date: Date | Timestamp) => (date instanceof Timestamp ? date.toDate() : date);
 
@@ -121,7 +117,7 @@ export default function AttendancePage() {
             <form ref={formRef} action={dispatch} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="staffId">Staff Member</Label>
-                <Select name="staffId" onValueChange={setSelectedStaffId} value={selectedStaffId ?? undefined}>
+                <Select name="staffId" onValueChange={setSelectedStaffId} value={selectedStaffId ?? ''}>
                   <SelectTrigger id="staffId">
                     <SelectValue placeholder="Select a staff member" />
                   </SelectTrigger>
@@ -180,7 +176,7 @@ export default function AttendancePage() {
           <CardHeader>
             <CardTitle>Attendance History</CardTitle>
             <CardDescription>
-              {selectedStaffId ? `Showing records for ${staff.find(s => s.id === selectedStaffId)?.name}` : 'Showing all recent records.'}
+              {selectedStaffId ? `Showing records for ${staff.find(s => s.id === selectedStaffId)?.name}` : 'Select a staff member to see their history.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -193,8 +189,23 @@ export default function AttendancePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRecords.length > 0 ? (
-                  filteredRecords.map((record) => (
+                {isLoadingRecords ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center">
+                      Loading records...
+                    </TableCell>
+                  </TableRow>
+                ) : !selectedStaffId ? (
+                   <TableRow>
+                    <TableCell colSpan={3} className="h-24 text-center">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <UserSearch className="size-8 text-muted-foreground" />
+                        <p className="text-muted-foreground">Please select a staff member.</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : records && records.length > 0 ? (
+                  records.map((record) => (
                     <TableRow key={record.id}>
                       <TableCell>{staff.find((s) => s.id === record.staffId)?.name}</TableCell>
                       <TableCell>{format(toDate(record.checkIn), 'MMM d, yyyy, hh:mm a')}</TableCell>
@@ -204,7 +215,7 @@ export default function AttendancePage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center">
-                      No attendance records found.
+                      No attendance records found for this staff member.
                     </TableCell>
                   </TableRow>
                 )}
