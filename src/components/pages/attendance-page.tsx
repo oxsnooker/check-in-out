@@ -111,31 +111,36 @@ export default function AttendancePage({
                  {state.errors?.staffId && <p className="text-sm font-medium text-destructive">{state.errors.staffId}</p>}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="date">Date</Label>
-                <div className="relative">
-                  <Input id="date" name="date" type="date" className="pl-10" defaultValue={format(new Date(), 'yyyy-MM-dd')}/>
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                </div>
-                 {state.errors?.date && <p className="text-sm font-medium text-destructive">{state.errors.date}</p>}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="checkIn">Check In</Label>
-                   <div className="relative">
-                     <Input id="checkIn" name="checkIn" type="time" className="pl-10" />
-                     <Clock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                   </div>
-                   {state.errors?.checkIn && <p className="text-sm font-medium text-destructive">{state.errors.checkIn}</p>}
+                  <Label>Check In</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="relative">
+                      <Input id="checkInDate" name="checkInDate" type="date" className="pl-10" defaultValue={format(new Date(), 'yyyy-MM-dd')} />
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    </div>
+                    <div className="relative">
+                      <Input id="checkIn" name="checkIn" type="time" className="pl-10" />
+                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                  {state.errors?.checkInDate && <p className="text-sm font-medium text-destructive">{state.errors.checkInDate}</p>}
+                  {state.errors?.checkIn && <p className="text-sm font-medium text-destructive">{state.errors.checkIn}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="checkOut">Check Out</Label>
-                   <div className="relative">
-                     <Input id="checkOut" name="checkOut" type="time" className="pl-10" />
-                     <Clock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                   </div>
-                    {state.errors?.checkOut && <p className="text-sm font-medium text-destructive">{state.errors.checkOut}</p>}
+                  <Label>Check Out</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="relative">
+                      <Input id="checkOutDate" name="checkOutDate" type="date" className="pl-10" defaultValue={format(new Date(), 'yyyy-MM-dd')} />
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    </div>
+                    <div className="relative">
+                      <Input id="checkOut" name="checkOut" type="time" className="pl-10" />
+                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                  {state.errors?.checkOutDate && <p className="text-sm font-medium text-destructive">{state.errors.checkOutDate}</p>}
+                  {state.errors?.checkOut && <p className="text-sm font-medium text-destructive">{state.errors.checkOut}</p>}
                 </div>
               </div>
               
@@ -158,7 +163,6 @@ export default function AttendancePage({
               <TableHeader>
                 <TableRow>
                   <TableHead>Staff</TableHead>
-                  <TableHead>Date</TableHead>
                   <TableHead>Check In</TableHead>
                   <TableHead>Check Out</TableHead>
                 </TableRow>
@@ -168,14 +172,13 @@ export default function AttendancePage({
                   filteredRecords.map((record) => (
                     <TableRow key={record.id}>
                       <TableCell>{staff.find((s) => s.id === record.staffId)?.name}</TableCell>
-                      <TableCell>{format(record.checkIn, 'MMM d, yyyy')}</TableCell>
-                      <TableCell>{format(record.checkIn, 'p')}</TableCell>
-                      <TableCell>{format(record.checkOut, 'p')}</TableCell>
+                      <TableCell>{format(record.checkIn, 'MMM d, yyyy p')}</TableCell>
+                      <TableCell>{format(record.checkOut, 'MMM d, yyyy p')}</TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center">
+                    <TableCell colSpan={3} className="text-center">
                       No attendance records found.
                     </TableCell>
                   </TableRow>

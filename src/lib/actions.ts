@@ -17,7 +17,8 @@ const FormSchema = z.object({
   staffId: z.string({
     invalid_type_error: 'Please select a staff member.',
   }),
-  date: z.string(),
+  checkInDate: z.string().optional(),
+  checkOutDate: z.string().optional(),
   checkIn: z.string().optional(),
   checkOut: z.string().optional(),
   amount: z.coerce.number().positive({ message: 'Please enter an amount greater than $0.' }).optional(),
@@ -26,7 +27,7 @@ const FormSchema = z.object({
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }).optional(),
 });
 
-const AddAttendance = FormSchema.pick({ staffId: true, date: true, checkIn: true, checkOut: true });
+const AddAttendance = FormSchema.pick({ staffId: true, checkInDate: true, checkIn: true, checkOutDate: true, checkOut: true });
 const AddAdvance = FormSchema.pick({ staffId: true, amount: true, date: true });
 const AddStaff = FormSchema.pick({ name: true, hourlyRate: true, password: true });
 const UpdateStaff = FormSchema.pick({ id: true, name: true, hourlyRate: true, password: true });
@@ -34,13 +35,15 @@ const UpdateStaff = FormSchema.pick({ id: true, name: true, hourlyRate: true, pa
 export type State = {
   errors?: {
     staffId?: string[];
-    date?: string[];
+    checkInDate?: string[];
+    checkOutDate?: string[];
     checkIn?: string[];
     checkOut?: string[];
     amount?: string[];
     name?: string[];
     hourlyRate?: string[];
     password?: string[];
+    date?: string[];
   };
   message?: string | null;
 };
@@ -52,15 +55,16 @@ function combineDateAndTime(date: string, time: string): Date {
 export async function addAttendance(prevState: State, formData: FormData) {
   const validatedFields = AddAttendance.safeParse({
     staffId: formData.get('staffId'),
-    date: formData.get('date'),
+    checkInDate: formData.get('checkInDate'),
     checkIn: formData.get('checkIn'),
+    checkOutDate: formData.get('checkOutDate'),
     checkOut: formData.get('checkOut'),
   });
 
-  if (!validatedFields.data?.date || !validatedFields.data?.checkIn || !validatedFields.data?.checkOut) {
+  if (!validatedFields.data?.checkInDate || !validatedFields.data?.checkIn || !validatedFields.data?.checkOutDate || !validatedFields.data?.checkOut) {
     return {
         errors: {},
-        message: 'Missing required fields: date, check-in time, or check-out time.',
+        message: 'Missing required fields: check-in date/time, or check-out date/time.',
     };
   }
 
@@ -71,14 +75,14 @@ export async function addAttendance(prevState: State, formData: FormData) {
     };
   }
 
-  const { staffId, date, checkIn, checkOut } = validatedFields.data;
+  const { staffId, checkInDate, checkIn, checkOutDate, checkOut } = validatedFields.data;
   const attendanceRecords = await getAttendanceRecords();
   
   const newRecord: AttendanceRecord = {
     id: Date.now().toString(),
     staffId,
-    checkIn: combineDateAndTime(date, checkIn),
-    checkOut: combineDateAndTime(date, checkOut),
+    checkIn: combineDateAndTime(checkInDate, checkIn),
+    checkOut: combineDateAndTime(checkOutDate, checkOut),
   };
   
   setAttendanceRecords([...attendanceRecords, newRecord]);
