@@ -113,7 +113,7 @@ export default function SalaryPage() {
   };
 
   const handlePasswordVerification = async () => {
-    if (!user || !selectedStaffId || !password) {
+    if (!user || !user.email || !selectedStaffId || !password) {
       toast({
         title: 'Error',
         description: 'Missing information for verification.',
@@ -125,23 +125,8 @@ export default function SalaryPage() {
     setIsVerifying(true);
 
     try {
-      // Fetch the selected staff member's email from Firestore
-      const staffDocRef = doc(firestore, 'staff', selectedStaffId);
-      const staffDoc = await getDoc(staffDocRef);
-
-      if (!staffDoc.exists() || !staffDoc.data().email) {
-          throw new Error('Staff email not found.');
-      }
-      const staffEmail = staffDoc.data().email;
-
-      // We need to re-authenticate the *currently logged-in* user.
-      // This flow assumes an admin is logged in and needs to re-verify their own credentials
-      // to view sensitive data. The logic should be adapted if the staff member themselves is logged in.
-      if (user.email !== staffEmail) {
-        // This is a simplified check. A real app might have different logic for admin-view flows.
-        console.warn("Logged-in user's email does not match selected staff's email. For this demo, we proceed, but this indicates a potential design issue for a real app.");
-      }
-
+      // Re-authenticate the *currently logged-in user* with their own password
+      // to authorize viewing sensitive data.
       const credential = EmailAuthProvider.credential(user.email, password);
       await reauthenticateWithCredential(user, credential);
       
