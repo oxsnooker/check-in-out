@@ -112,7 +112,7 @@ export default function AttendancePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Staff</TableHead>
+                <TableHead>Date</TableHead>
                 <TableHead>Check In</TableHead>
                 <TableHead>Check Out</TableHead>
               </TableRow>
@@ -136,9 +136,9 @@ export default function AttendancePage() {
               ) : records && records.length > 0 ? (
                 records.map((record) => (
                   <TableRow key={record.id}>
-                    <TableCell>{staff.find((s) => s.id === record.staffId)?.name}</TableCell>
-                    <TableCell>{format(toDate(record.checkIn), 'MMM d, yyyy, hh:mm a')}</TableCell>
-                    <TableCell>{format(toDate(record.checkOut), 'MMM d, yyyy, hh:mm a')}</TableCell>
+                    <TableCell>{format(toDate(record.checkIn), 'MMM d, yyyy')}</TableCell>
+                    <TableCell>{format(toDate(record.checkIn), 'hh:mm a')}</TableCell>
+                    <TableCell>{format(toDate(record.checkOut), 'hh:mm a')}</TableCell>
                   </TableRow>
                 ))
               ) : (
