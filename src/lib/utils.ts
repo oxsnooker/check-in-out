@@ -9,10 +9,11 @@ export function cn(...inputs: ClassValue[]) {
 
 const toDate = (date: Date | Timestamp) => (date instanceof Timestamp ? date.toDate() : date);
 
-export function calculateWorkingHours(checkIn: Date | Timestamp, checkOut: Date | Timestamp): number {
+export function calculateWorkingHours(checkIn?: Date | Timestamp, checkOut?: Date | Timestamp): number {
+  if (!checkIn || !checkOut) return 0;
   const checkInDate = toDate(checkIn);
   const checkOutDate = toDate(checkOut);
-  if (!checkInDate || !checkOutDate || checkOutDate < checkInDate) {
+  if (checkOutDate < checkInDate) {
     return 0;
   }
   const diffMinutes = differenceInMinutes(checkOutDate, checkInDate);

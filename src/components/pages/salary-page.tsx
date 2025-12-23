@@ -28,7 +28,7 @@ interface SalaryData {
 }
 
 export default function SalaryPage() {
-  const [selectedStaffId, setSelectedStaffId] = React.useState<string>('all');
+  const [selectedStaffId, setSelectedStaffId] = React.useState<string | undefined>();
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
 
@@ -50,6 +50,13 @@ export default function SalaryPage() {
   }, [firestore, user]);
   const { data: advances, isLoading: isLoadingAdvances } = useCollection<AdvancePayment>(advancePaymentsCollectionGroup);
 
+  React.useEffect(() => {
+    if (staff && staff.length > 0 && !selectedStaffId) {
+      setSelectedStaffId(staff[0].id);
+    }
+  }, [staff, selectedStaffId]);
+
+
   if (isUserLoading || isLoadingStaff || isLoadingAttendance || isLoadingAdvances) {
     return <SimpleLogin title="Salary Overview" description="Please sign in to view salaries." />;
   }
@@ -63,7 +70,9 @@ export default function SalaryPage() {
     const staffAdvances = advances.filter(a => a.staffId === s.id);
 
     const totalHours = staffAttendance.reduce((acc, record) => {
-      return acc + calculateWorkingHours(record.checkIn, record.checkOut);
+        const hours1 = record.checkIn && record.checkOut ? calculateWorkingHours(record.checkIn, record.checkOut) : 0;
+        const hours2 = record.checkIn2 && record.checkOut2 ? calculateWorkingHours(record.checkIn2, record.checkOut2) : 0;
+        return acc + hours1 + hours2;
     }, 0);
 
     const totalAdvance = staffAdvances.reduce((acc, payment) => acc + payment.amount, 0);
@@ -82,10 +91,9 @@ export default function SalaryPage() {
     };
   });
 
-  const filteredData =
-    selectedStaffId === 'all'
-      ? salaryData
-      : salaryData.filter((s) => s.staffId === selectedStaffId);
+  const filteredData = selectedStaffId
+    ? salaryData.filter((s) => s.staffId === selectedStaffId)
+    : [];
 
   return (
     <div className="space-y-6">
@@ -96,7 +104,6 @@ export default function SalaryPage() {
             <SelectValue placeholder="Select staff" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Staff</SelectItem>
             {staff.map((s) => (
               <SelectItem key={s.id} value={s.id}>
                 {s.name}
