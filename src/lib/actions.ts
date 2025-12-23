@@ -14,7 +14,6 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
-import { signInWithEmailAndPassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 
 import type { Staff } from './definitions';
 import { v4 as uuidv4 } from 'uuid';
@@ -56,14 +55,13 @@ const AddAttendance = FormSchema.pick({
   checkOut: true,
 });
 const AddAdvance = FormSchema.pick({ staffId: true, amount: true, date: true });
-const AddStaff = FormSchema.pick({ name: true, email: true, hourlyRate: true, password: true });
+const AddStaff = FormSchema.pick({ name: true, email: true, hourlyRate: true });
 const UpdateStaff = FormSchema.pick({
   id: true,
   name: true,
   hourlyRate: true,
-  password: true,
 });
-const SignIn = FormSchema.pick({ email: true, password: true });
+
 
 export type State = {
   errors?: {
@@ -196,7 +194,6 @@ export async function addStaff(prevState: State, formData: FormData) {
     name: formData.get('name'),
     email: formData.get('email'),
     hourlyRate: formData.get('hourlyRate'),
-    password: formData.get('password'),
   });
 
   if (!validatedFields.success) {
@@ -206,23 +203,11 @@ export async function addStaff(prevState: State, formData: FormData) {
     };
   }
 
-  const { name, email, hourlyRate, password } = validatedFields.data;
-  
-  if (!password) {
-    return {
-      errors: { password: ['Password is required.'] },
-      message: 'Missing Fields. Failed to Add Staff.',
-    };
-  }
+  const { name, email, hourlyRate } = validatedFields.data;
 
-  const { firestore, auth } = initializeFirebase();
+  const { firestore } = initializeFirebase();
 
   try {
-    // We do not create the user with email and password here.
-    // That should be done through the Firebase Admin SDK in a secure environment,
-    // or through the client-side authentication flow.
-    // This action will just store the staff details in Firestore.
-
     const staffId = uuidv4();
     await setDoc(doc(firestore, 'staff', staffId), {
       id: staffId,
@@ -245,12 +230,7 @@ export async function addStaff(prevState: State, formData: FormData) {
 
 
 export async function updateStaff(prevState: State, formData: FormData) {
-  // Omitting password from validation as it's not used.
-  const validatedFields = FormSchema.pick({
-    id: true,
-    name: true,
-    hourlyRate: true,
-  }).safeParse({
+  const validatedFields = UpdateStaff.safeParse({
     id: formData.get('id'),
     name: formData.get('name'),
     hourlyRate: formData.get('hourlyRate'),
@@ -287,29 +267,23 @@ export async function updateStaff(prevState: State, formData: FormData) {
 export async function deleteStaff(staffId: string) {
   const { firestore } = initializeFirebase();
   try {
-    // Start a batch to delete staff and their related subcollections
     const batch = writeBatch(firestore);
 
-    // 1. Delete the staff document itself
     const staffDocRef = doc(firestore, 'staff', staffId);
     batch.delete(staffDocRef);
 
-    // 2. Delete attendance records
     const attendanceRecordsRef = collection(firestore, `staff/${staffId}/attendance_records`);
     const attendanceRecordsSnapshot = await getDocs(attendanceRecordsRef);
     attendanceRecordsSnapshot.forEach(doc => batch.delete(doc.ref));
 
-    // 3. Delete advance payments
     const advancePaymentsRef = collection(firestore, `staff/${staffId}/advance_payments`);
     const advancePaymentsSnapshot = await getDocs(advancePaymentsRef);
     advancePaymentsSnapshot.forEach(doc => batch.delete(doc.ref));
     
-    // 4. Delete salaries
     const salariesRef = collection(firestore, `staff/${staffId}/salaries`);
     const salariesSnapshot = await getDocs(salariesRef);
     salariesSnapshot.forEach(doc => batch.delete(doc.ref));
 
-    // Commit the batch
     await batch.commit();
 
     revalidatePath('/admin');
@@ -318,69 +292,4 @@ export async function deleteStaff(staffId: string) {
     console.error("Failed to delete staff member:", error);
     return { message: 'Database Error: Failed to Delete Staff Member.' };
   }
-}
-
-export async function signInWithEmail(prevState: State, formData: FormData) {
-  const validatedFields = SignIn.safeParse({
-    email: formData.get('email'),
-    password: formData.get('password'),
-  });
-
-  if (!validatedFields.success) {
-    return {
-      errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Missing Fields. Failed to Sign In.',
-    };
-  }
-  const { email, password } = validatedFields.data;
-
-  if (!email || !password) {
-      return { message: 'Email and password are required.' };
-  }
-
-  // This is a server action, but signInWithEmailAndPassword should be called on the client
-  // to get the auth state. We'll return the credentials and let the client handle it.
-  // This is not ideal, but for the purpose of this example, we proceed.
-  // A better approach would be to use a client-side function to call Firebase Auth.
-  
-  // The following code will not work as intended in a Server Action because
-  // Firebase Auth is designed for the client.
-  // We are returning an error to indicate this.
-
-  return {
-    message: 'Sign in must be handled on the client. This action is a placeholder.',
-    errors: { email: ['Sign-in logic needs to be client-side.'] }
-  };
-}
-
-export async function verifyStaffPassword(prevState: State, formData: FormData) {
-  const validatedFields = FormSchema.pick({
-    email: true,
-    password: true,
-  }).safeParse({
-    email: formData.get('email'),
-    password: formData.get('password'),
-  });
-
-  if (!validatedFields.success) {
-    return {
-      errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Missing Fields. Failed to Verify.',
-    };
-  }
-
-  const { email, password } = validatedFields.data;
-
-  if (!email || !password) {
-    return { message: 'Email and password are required for verification.' };
-  }
-  
-  // This action is problematic because re-authentication is a client-side
-  // operation that requires an active user session.
-  // Server Actions run in a separate environment.
-  // We'll leave the logic here, but it needs to be called from a client component
-  // that can provide the currently authenticated user object.
-  return {
-    message: "This server action is a placeholder. The re-authentication logic must be handled on the client."
-  };
 }

@@ -24,34 +24,16 @@ import {
   DollarSign,
   Clock,
   Hourglass,
-  CircleSlash,
   UserSearch,
 } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import {
   collection,
   query,
   where,
   collectionGroup,
-  doc,
-  getDoc,
 } from 'firebase/firestore';
 import { calculateWorkingHours } from '@/lib/utils';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose,
-} from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
-import { reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 
 interface SalaryData {
   staffId: string;
@@ -65,18 +47,10 @@ interface SalaryData {
 
 export default function SalaryPage() {
   const firestore = useFirestore();
-  const { user } = useUser();
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(
     null
   );
-  const [verifiedStaffId, setVerifiedStaffId] = React.useState<string | null>(
-    null
-  );
-  const [password, setPassword] = React.useState('');
-  const [isVerifying, setIsVerifying] = React.useState(false);
-  const [isDialogOpen, setDialogOpen] = React.useState(false);
-  const { toast } = useToast();
-
+  
   const staffCollection = useMemoFirebase(() => {
     return collection(firestore, 'staff');
   }, [firestore]);
@@ -85,77 +59,34 @@ export default function SalaryPage() {
   );
 
   const attendanceCollectionGroup = useMemoFirebase(() => {
-    if (!verifiedStaffId) return null;
+    if (!selectedStaffId) return null;
     return query(
       collectionGroup(firestore, 'attendance_records'),
-      where('staffId', '==', verifiedStaffId)
+      where('staffId', '==', selectedStaffId)
     );
-  }, [firestore, verifiedStaffId]);
+  }, [firestore, selectedStaffId]);
   const { data: attendance, isLoading: isLoadingAttendance } =
     useCollection<AttendanceRecord>(attendanceCollectionGroup);
 
   const advancePaymentsCollectionGroup = useMemoFirebase(() => {
-    if (!verifiedStaffId) return null;
+    if (!selectedStaffId) return null;
     return query(
       collectionGroup(firestore, 'advance_payments'),
-      where('staffId', '==', verifiedStaffId)
+      where('staffId', '==', selectedStaffId)
     );
-  }, [firestore, verifiedStaffId]);
+  }, [firestore, selectedStaffId]);
   const { data: advances, isLoading: isLoadingAdvances } =
     useCollection<AdvancePayment>(advancePaymentsCollectionGroup);
 
   const handleStaffSelection = (staffId: string) => {
     setSelectedStaffId(staffId);
-    setVerifiedStaffId(null); // Reset verification on new selection
-    if (staffId) {
-      setDialogOpen(true);
-    }
   };
 
-  const handlePasswordVerification = async () => {
-    if (!user || !user.email || !selectedStaffId || !password) {
-      toast({
-        title: 'Error',
-        description: 'Missing information for verification.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsVerifying(true);
-
-    try {
-      // Re-authenticate the *currently logged-in user* with their own password
-      // to authorize viewing sensitive data.
-      const credential = EmailAuthProvider.credential(user.email, password);
-      await reauthenticateWithCredential(user, credential);
-      
-      setVerifiedStaffId(selectedStaffId);
-      toast({
-        title: 'Success',
-        description: 'Verification successful. Showing salary data.',
-      });
-      setDialogOpen(false);
-    } catch (error: any) {
-      console.error(error);
-      toast({
-        title: 'Verification Failed',
-        description:
-          'Incorrect password or another error occurred. Please try again.',
-        variant: 'destructive',
-      });
-      setVerifiedStaffId(null);
-    } finally {
-      setIsVerifying(false);
-      setPassword('');
-    }
-  };
-
-  const selectedStaffInfo = staff?.find((s) => s.id === verifiedStaffId);
+  const selectedStaffInfo = staff?.find((s) => s.id === selectedStaffId);
 
   let salaryData: SalaryData | null = null;
 
-  if (verifiedStaffId && selectedStaffInfo && attendance && advances) {
+  if (selectedStaffId && selectedStaffInfo && attendance && advances) {
     const totalHours = attendance.reduce((acc, record) => {
       const hours1 =
         record.checkIn && record.checkOut
@@ -177,7 +108,7 @@ export default function SalaryPage() {
     const balance = salaryAmount - totalAdvance;
 
     salaryData = {
-      staffId: verifiedStaffId,
+      staffId: selectedStaffId,
       staffName: selectedStaffInfo.name,
       totalHours,
       hourlyRate: selectedStaffInfo.hourlyRate,
@@ -188,7 +119,7 @@ export default function SalaryPage() {
   }
 
   const isLoadingData =
-    (isLoadingAttendance || isLoadingAdvances) && !!verifiedStaffId;
+    (isLoadingAttendance || isLoadingAdvances) && !!selectedStaffId;
 
   return (
     <div className="space-y-6">
@@ -222,40 +153,6 @@ export default function SalaryPage() {
         </CardHeader>
       </Card>
       
-      <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Password Verification Required</DialogTitle>
-            <DialogDescription>
-              To view the salary details for{' '}
-              {staff?.find((s) => s.id === selectedStaffId)?.name}, please enter
-              your password.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="secondary">
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button onClick={handlePasswordVerification} disabled={isVerifying}>
-              {isVerifying ? 'Verifying...' : 'Verify'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {isLoadingData ? (
         <div className="flex justify-center p-12">
             <p>Loading salary data...</p>

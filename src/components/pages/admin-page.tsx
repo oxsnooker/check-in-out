@@ -146,11 +146,6 @@ export default function AdminPage() {
                 <Input id="hourlyRate" name="hourlyRate" type="number" step="0.01" placeholder="20.00" />
                 {addState.errors?.hourlyRate && <p className="text-sm font-medium text-destructive">{addState.errors.hourlyRate}</p>}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input id="password" name="password" type="password" />
-                {addState.errors?.password && <p className="text-sm font-medium text-destructive">{addState.errors.password}</p>}
-              </div>
               <AddStaffSubmitButton />
             </form>
           </CardContent>
@@ -199,11 +194,6 @@ export default function AdminPage() {
                                         <Label htmlFor="edit-hourlyRate">Hourly Rate ($)</Label>
                                         <Input id="edit-hourlyRate" name="hourlyRate" type="number" step="0.01" defaultValue={s.hourlyRate} />
                                         {updateState.errors?.hourlyRate && <p className="text-sm font-medium text-destructive">{updateState.errors.hourlyRate}</p>}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="edit-password">New Password (optional)</Label>
-                                        <Input id="edit-password" name="password" type="password" placeholder="Leave blank to keep current password"/>
-                                        {updateState.errors?.password && <p className="text-sm font-medium text-destructive">{updateState.errors.password}</p>}
                                     </div>
                                 </div>
                                 <DialogFooter>
