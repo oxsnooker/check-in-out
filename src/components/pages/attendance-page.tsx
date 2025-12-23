@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDate, isSameDay } from 'date-fns';
-import { Timestamp, collection, query, where } from 'firebase/firestore';
+import { Timestamp, collection, query, where, doc, setDoc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 import {
   Card,
@@ -26,14 +27,24 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
 import type { Staff, AttendanceRecord } from '@/lib/definitions';
 import { UserSearch } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { SimpleLogin } from '@/components/simple-login';
 
+function combineDateAndTime(date: Date, time: string): Date {
+    const [hours, minutes] = time.split(':');
+    const newDate = new Date(date);
+    newDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+    return newDate;
+}
+
+
 export default function AttendancePage() {
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());
+  const { toast } = useToast();
 
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
@@ -73,13 +84,55 @@ export default function AttendancePage() {
 
   const attendanceMap = React.useMemo(() => {
     if (!records) return new Map();
-    const map = new Map<number, AttendanceRecord>();
+    const map = new Map<string, AttendanceRecord>();
     records.forEach(record => {
-      const dayOfMonth = getDate(toDate(record.checkIn));
-      map.set(dayOfMonth, record);
+      const dayKey = format(toDate(record.checkIn), 'yyyy-MM-dd');
+      map.set(dayKey, record);
     });
     return map;
   }, [records]);
+
+  const handleTimeChange = async (day: Date, field: 'checkIn' | 'checkOut', time: string) => {
+    if (!selectedStaffId || !time) return;
+
+    const dayKey = format(day, 'yyyy-MM-dd');
+    let existingRecord = attendanceMap.get(dayKey);
+
+    const newTime = combineDateAndTime(day, time);
+    let checkInTime = existingRecord ? toDate(existingRecord.checkIn) : newTime;
+    let checkOutTime = existingRecord ? toDate(existingRecord.checkOut) : newTime;
+
+    if (field === 'checkIn') {
+        checkInTime = newTime;
+    } else {
+        checkOutTime = newTime;
+    }
+    
+    // If there's no record, we use the same time for both to initialize.
+    if (!existingRecord) {
+        if (field === 'checkIn') {
+            checkOutTime = newTime;
+        } else {
+            checkInTime = newTime;
+        }
+    }
+
+    const recordId = existingRecord ? existingRecord.id : dayKey;
+    const docRef = doc(firestore, `staff/${selectedStaffId}/attendance_records`, recordId);
+
+    try {
+        await setDoc(docRef, {
+            staffId: selectedStaffId,
+            checkIn: Timestamp.fromDate(checkInTime),
+            checkOut: Timestamp.fromDate(checkOutTime),
+        }, { merge: true });
+        toast({ title: 'Success', description: 'Attendance record updated.' });
+    } catch (error) {
+        toast({ title: 'Error', description: 'Failed to update attendance.', variant: 'destructive' });
+        console.error("Failed to update attendance:", error);
+    }
+  };
+
 
   if (isUserLoading || isLoadingStaff) {
     return <SimpleLogin title="Attendance" description="Please sign in to manage attendance." />;
@@ -149,12 +202,26 @@ export default function AttendancePage() {
                 </TableRow>
               ) : daysInMonth.length > 0 ? (
                 daysInMonth.map((day) => {
-                  const record = attendanceMap.get(getDate(day));
+                  const record = attendanceMap.get(format(day, 'yyyy-MM-dd'));
                   return (
                     <TableRow key={day.toISOString()}>
                       <TableCell>{format(day, 'MMM d, yyyy')}</TableCell>
-                      <TableCell>{record ? format(toDate(record.checkIn), 'hh:mm a') : '—'}</TableCell>
-                      <TableCell>{record ? format(toDate(record.checkOut), 'hh:mm a') : '—'}</TableCell>
+                      <TableCell>
+                         <Input
+                            type="time"
+                            defaultValue={record ? format(toDate(record.checkIn), 'HH:mm') : ''}
+                            onBlur={(e) => handleTimeChange(day, 'checkIn', e.target.value)}
+                            className="w-[120px]"
+                         />
+                      </TableCell>
+                       <TableCell>
+                         <Input
+                            type="time"
+                            defaultValue={record ? format(toDate(record.checkOut), 'HH:mm') : ''}
+                            onBlur={(e) => handleTimeChange(day, 'checkOut', e.target.value)}
+                            className="w-[120px]"
+                         />
+                      </TableCell>
                     </TableRow>
                   );
                 })
