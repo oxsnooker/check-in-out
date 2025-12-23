@@ -151,6 +151,15 @@ export async function addAttendance(prevState: State, formData: FormData) {
   const { staffId, checkInDate, checkIn, checkOutDate, checkOut } =
     validatedFields.data;
 
+  if (!staffId) {
+    return {
+      errors: {
+        staffId: ['Please select a staff member.'],
+      },
+      message: 'Missing Fields. Failed to Add Attendance.',
+    };
+  }
+    
   const { firestore } = initializeFirebase();
   const attendanceCollection = collection(
     firestore,
