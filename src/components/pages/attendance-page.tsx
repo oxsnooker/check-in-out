@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { addAttendance, type State } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -55,7 +56,7 @@ export default function AttendancePage({
   const formRef = React.useRef<HTMLFormElement>(null);
 
   const initialState: State = { message: null, errors: {} };
-  const [state, dispatch] = useFormState(addAttendance, initialState);
+  const [state, dispatch] = useActionState(addAttendance, initialState);
 
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
 

@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { addStaff, updateStaff, deleteStaff, type State } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -71,10 +72,10 @@ export default function AdminPage({ staff }: { staff: Staff[] }) {
   const [isEditDialogOpen, setEditDialogOpen] = React.useState(false);
   
   const addInitialState: State = { message: null, errors: {} };
-  const [addState, addDispatch] = useFormState(addStaff, addInitialState);
+  const [addState, addDispatch] = useActionState(addStaff, addInitialState);
 
   const updateInitialState: State = { message: null, errors: {} };
-  const [updateState, updateDispatch] = useFormState(updateStaff, updateInitialState);
+  const [updateState, updateDispatch] = useActionState(updateStaff, updateInitialState);
 
   React.useEffect(() => {
     if (addState.message) {
