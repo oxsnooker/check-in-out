@@ -83,8 +83,7 @@ export default function SalaryPage() {
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !selectedStaffId || !isVerified) return null;
     return query(
-      collection(firestore, `staff/${selectedStaffId}/attendance_records`),
-      where('staffId', '==', selectedStaffId)
+      collection(firestore, `staff/${selectedStaffId}/attendance_records`)
     );
   }, [firestore, selectedStaffId, isVerified]);
 
@@ -93,8 +92,7 @@ export default function SalaryPage() {
   const advancesQuery = useMemoFirebase(() => {
     if (!firestore || !selectedStaffId || !isVerified) return null;
     return query(
-      collection(firestore, `staff/${selectedStaffId}/advance_payments`),
-      where('staffId', '==', selectedStaffId)
+      collection(firestore, `staff/${selectedStaffId}/advance_payments`)
     );
   }, [firestore, selectedStaffId, isVerified]);
 

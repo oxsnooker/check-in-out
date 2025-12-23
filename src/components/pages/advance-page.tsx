@@ -59,7 +59,6 @@ export default function AdvancePage() {
     const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
     return query(
       collection(firestore, `staff/${selectedStaffId}/advance_payments`),
-      where('staffId', '==', selectedStaffId),
       where('date', '>=', startDate),
       where('date', '<=', endDate)
     );
