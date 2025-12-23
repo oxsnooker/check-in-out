@@ -76,10 +76,6 @@ export default function AdvancePage() {
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
-
-  const getStaffName = (staffId: string) => {
-    return staff?.find((s) => s.id === staffId)?.name || 'Unknown Staff';
-  };
   
   const formatDate = (date: any) => {
     if (date instanceof Timestamp) {
@@ -159,7 +155,6 @@ export default function AdvancePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Staff</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
               </TableRow>
@@ -167,13 +162,13 @@ export default function AdvancePage() {
             <TableBody>
               {isLoadingPayments ? (
                  <TableRow>
-                    <TableCell colSpan={3} className="h-24 text-center">
+                    <TableCell colSpan={2} className="h-24 text-center">
                         Loading payments...
                     </TableCell>
                 </TableRow>
               ) : !selectedStaffId ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center">
+                  <TableCell colSpan={2} className="h-24 text-center">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <UserSearch className="size-8 text-muted-foreground" />
                       <p className="text-muted-foreground">
@@ -185,7 +180,6 @@ export default function AdvancePage() {
               ) : payments && payments.length > 0 ? (
                 payments.map((payment) => (
                   <TableRow key={payment.id}>
-                    <TableCell>{getStaffName(payment.staffId)}</TableCell>
                     <TableCell>{formatDate(payment.date)}</TableCell>
                     <TableCell className="text-right">
                       {payment.amount.toLocaleString('en-US', {
@@ -197,7 +191,7 @@ export default function AdvancePage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center">
+                  <TableCell colSpan={2} className="h-24 text-center">
                     No advance payments found for this staff member.
                   </TableCell>
                 </TableRow>
