@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useActionState } from 'react';
+import { useActionState } from 'react-dom';
 import { useFormStatus } from 'react-dom';
 import { addAdvance, type State } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
@@ -50,9 +50,7 @@ export default function AdvancePage() {
 
   const advancePaymentsCollection = useMemoFirebase(() => {
     if (!selectedStaffId) return null;
-    return query(
-      collection(firestore, `staff/${selectedStaffId}/advance_payments`)
-    );
+    return collection(firestore, `staff/${selectedStaffId}/advance_payments`);
   }, [firestore, selectedStaffId]);
 
   const { data: payments, isLoading: isLoadingPayments } = useCollection<AdvancePayment>(advancePaymentsCollection);
