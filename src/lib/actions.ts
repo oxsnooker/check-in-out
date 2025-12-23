@@ -11,7 +11,11 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, updatePassword } from 'firebase/auth';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updatePassword,
+} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { initializeFirebase } from '@/firebase';
@@ -41,8 +45,8 @@ const FormSchema = z.object({
     .optional(),
   password: z
     .string()
-    .min(6, { message: 'Password must be at least 6 characters.' })
-    .optional(),
+    .min(6, { message: 'Password must be at least 6 characters.' }),
+  email: z.string().email({ message: 'Please enter a valid email.' }).optional(),
   date: z.string().optional(),
 });
 
@@ -61,6 +65,8 @@ const UpdateStaff = FormSchema.pick({
   hourlyRate: true,
   password: true,
 });
+const SignIn = FormSchema.pick({ email: true, password: true });
+
 
 export type State = {
   errors?: {
@@ -74,9 +80,40 @@ export type State = {
     hourlyRate?: string[];
     password?: string[];
     date?: string[];
+    email?: string[];
   };
   message?: string | null;
 };
+
+export async function signInWithEmail(prevState: State, formData: FormData) {
+    const validatedFields = SignIn.safeParse({
+        email: formData.get('email'),
+        password: formData.get('password'),
+    });
+
+    if (!validatedFields.success) {
+        return {
+            errors: validatedFields.error.flatten().fieldErrors,
+            message: 'Invalid fields. Failed to sign in.',
+        }
+    }
+
+    const { email, password } = validatedFields.data;
+    const { auth } = initializeFirebase();
+
+    try {
+        await signInWithEmailAndPassword(auth, email!, password);
+        // Revalidation might not be necessary as onAuthStateChanged handles UI updates
+        // but can be useful if there are server-rendered parts that need to change.
+        revalidatePath('/');
+        return { message: 'Sign in successful.' };
+    } catch(e: any) {
+        return {
+             message: `Sign in failed: ${e.message}`,
+        }
+    }
+}
+
 
 function combineDateAndTime(date: string, time: string): Date {
   return new Date(`${date}T${time}`);
