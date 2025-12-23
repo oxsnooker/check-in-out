@@ -1,12 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useActionState } from 'react-dom';
-import { useFormStatus } from 'react-dom';
-import { addAdvance, type State } from '@/lib/actions';
-import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { Timestamp, collection, collectionGroup, query, where } from 'firebase/firestore';
 
 import {
   Card,
@@ -15,9 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -34,34 +26,19 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { Staff, AdvancePayment } from '@/lib/definitions';
-import { Calendar, DollarSign, Send, UserSearch } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { UserSearch } from 'lucide-react';
+import { MOCK_STAFF, MOCK_ADVANCES } from '@/lib/data';
 
 
 export default function AdvancePage() {
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
-  
-  const firestore = useFirestore();
+  const [staff] = React.useState<Staff[]>(MOCK_STAFF);
+  const [allPayments] = React.useState<AdvancePayment[]>(MOCK_ADVANCES);
 
-  const staffCollection = useMemoFirebase(() => {
-    return collection(firestore, 'staff');
-  }, [firestore]);
-  const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
-
-  const advancePaymentsCollection = useMemoFirebase(() => {
-    if (!selectedStaffId) return null;
-    return collection(firestore, `staff/${selectedStaffId}/advance_payments`);
-  }, [firestore, selectedStaffId]);
-
-  const { data: payments, isLoading: isLoadingPayments } = useCollection<AdvancePayment>(advancePaymentsCollection);
-
-
-  if (isLoadingStaff ) {
-    return <p>Loading...</p>;
-  }
-
-  const toDate = (date: Date | Timestamp) => (date instanceof Timestamp ? date.toDate() : date);
-
+  const payments = selectedStaffId 
+    ? allPayments.filter(p => p.staffId === selectedStaffId)
+    : [];
+    
   return (
     <div className="grid grid-cols-1 gap-8">
       <Card>
@@ -95,13 +72,7 @@ export default function AdvancePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoadingPayments ? (
-                   <TableRow>
-                    <TableCell colSpan={3} className="text-center">
-                      Loading records...
-                    </TableCell>
-                  </TableRow>
-                ) : !selectedStaffId ? (
+                {!selectedStaffId ? (
                    <TableRow>
                     <TableCell colSpan={3} className="h-24 text-center">
                       <div className="flex flex-col items-center justify-center gap-2">
@@ -114,7 +85,7 @@ export default function AdvancePage() {
                   payments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell>{staff && staff.find((s) => s.id === payment.staffId)?.name}</TableCell>
-                      <TableCell>{format(toDate(payment.date), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>{format(payment.date, 'MMM d, yyyy')}</TableCell>
                       <TableCell className="text-right">
                         {payment.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                       </TableCell>

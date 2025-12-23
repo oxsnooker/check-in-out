@@ -1,19 +1,8 @@
-/**
- * This ruleset allows public read and write access to all data.
- * It is suitable for initial development and prototyping where security is not a concern.
- *
- * WARNING: This is an insecure configuration and should not be used in production
- * without implementing proper security rules to protect your data.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    /**
-     * This rule matches any document in any collection.
-     * It allows read and write access to anyone.
-     */
-    match /{path=**} {
-      allow read, write: if true;
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

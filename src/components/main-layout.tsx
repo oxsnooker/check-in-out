@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/sidebar';
 import { NavItems } from './nav-items';
 import { TimerIcon } from 'lucide-react';
+import { PageHeader } from './page-header';
 
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
@@ -34,9 +35,6 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-14 items-center justify-end gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
-           <SidebarTrigger className="md:hidden" />
-        </header>
         <div className="p-4 md:p-6 lg:p-8">{children}</div>
       </SidebarInset>
     </SidebarProvider>

@@ -2,19 +2,6 @@
 
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
-import {
-  setDoc,
-  addDoc,
-  deleteDoc,
-  doc,
-  collection,
-  serverTimestamp,
-  Timestamp,
-  getDocs,
-  writeBatch
-} from 'firebase/firestore';
-import { initializeFirebase } from '@/firebase';
-
 import type { Staff } from './definitions';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -47,22 +34,6 @@ const FormSchema = z.object({
   date: z.string().optional(),
 });
 
-const AddAttendance = FormSchema.pick({
-  staffId: true,
-  checkInDate: true,
-  checkIn: true,
-  checkOutDate: true,
-  checkOut: true,
-});
-const AddAdvance = FormSchema.pick({ staffId: true, amount: true, date: true });
-const AddStaff = FormSchema.pick({ name: true, email: true, hourlyRate: true });
-const UpdateStaff = FormSchema.pick({
-  id: true,
-  name: true,
-  hourlyRate: true,
-});
-
-
 export type State = {
   errors?: {
     staffId?: string[];
@@ -80,216 +51,27 @@ export type State = {
   message?: string | null;
 };
 
-
-function combineDateAndTime(date: string, time: string): Date {
-  return new Date(`${date}T${time}`);
-}
-
-export async function addAttendance(prevState: State, formData: FormData) {
-  const validatedFields = AddAttendance.safeParse({
-    staffId: formData.get('staffId'),
-    checkInDate: formData.get('checkInDate'),
-    checkIn: formData.get('checkIn'),
-    checkOutDate: formData.get('checkOutDate'),
-    checkOut: formData.get('checkOut'),
-  });
-
-  if (
-    !validatedFields.data?.checkInDate ||
-    !validatedFields.data?.checkIn ||
-    !validatedFields.data?.checkOutDate ||
-    !validatedFields.data?.checkOut
-  ) {
-    return {
-      errors: {},
-      message:
-        'Missing required fields: check-in date/time, or check-out date/time.',
-    };
-  }
-
-  if (!validatedFields.success) {
-    return {
-      errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Missing Fields. Failed to Add Attendance.',
-    };
-  }
-
-  const { staffId, checkInDate, checkIn, checkOutDate, checkOut } =
-    validatedFields.data;
-
-  if (!staffId) {
-    return {
-      errors: {
-        staffId: ['Please select a staff member.'],
-      },
-      message: 'Missing Fields. Failed to Add Attendance.',
-    };
-  }
-    
-  const { firestore } = initializeFirebase();
-  const attendanceCollection = collection(
-    firestore,
-    `staff/${staffId}/attendance_records`
-  );
-
-  try {
-    await addDoc(attendanceCollection, {
-      staffId,
-      checkIn: Timestamp.fromDate(combineDateAndTime(checkInDate, checkIn)),
-      checkOut: Timestamp.fromDate(
-        combineDateAndTime(checkOutDate, checkOut)
-      ),
-      createdAt: serverTimestamp(),
-    });
-
-    revalidatePath('/');
-    return { message: 'Attendance added successfully.' };
-  } catch (e: any) {
-    return {
-      message: `Database Error: Failed to Add Attendance. ${e.message}`,
-    };
-  }
-}
-
-export async function addAdvance(prevState: State, formData: FormData) {
-  const validatedFields = AddAdvance.safeParse({
-    staffId: formData.get('staffId'),
-    amount: formData.get('amount'),
-    date: formData.get('date'),
-  });
-
-  if (!validatedFields.success) {
-    return {
-      errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Missing Fields. Failed to Add Advance.',
-    };
-  }
-
-  const { staffId, amount, date } = validatedFields.data;
-
-  const { firestore } = initializeFirebase();
-  const advancePaymentsCollection = collection(
-    firestore,
-    `staff/${staffId}/advance_payments`
-  );
-
-  try {
-    await addDoc(advancePaymentsCollection, {
-      staffId,
-      amount,
-      date: Timestamp.fromDate(new Date(date!)),
-      createdAt: serverTimestamp(),
-    });
-    revalidatePath('/advance');
-    return { message: 'Advance payment added successfully.' };
-  } catch (e: any) {
-    return {
-      message: `Database Error: Failed to add advance payment. ${e.message}`,
-    };
-  }
-}
-
 export async function addStaff(prevState: State, formData: FormData) {
-  const validatedFields = AddStaff.safeParse({
-    name: formData.get('name'),
-    email: formData.get('email'),
-    hourlyRate: formData.get('hourlyRate'),
-  });
-
-  if (!validatedFields.success) {
-    return {
-      errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Missing Fields. Failed to Add Staff.',
-    };
-  }
-
-  const { name, email, hourlyRate } = validatedFields.data;
-
-  const { firestore } = initializeFirebase();
-
-  try {
-    const staffId = uuidv4();
-    await setDoc(doc(firestore, 'staff', staffId), {
-      id: staffId,
-      name,
-      email,
-      hourlyRate,
-    });
-
-    revalidatePath('/admin');
-    return { message: 'Staff member added successfully.' };
-  } catch (e: any) {
-    if (e.code === 'auth/email-already-in-use') {
-        return { message: 'This email is already in use.' };
-    }
-    return {
-      message: `Database Error: Failed to add staff member. ${e.message}`,
-    };
-  }
+  console.log('addStaff called, but database is removed.');
+  return { message: 'Staff member added (simulation).' };
 }
-
 
 export async function updateStaff(prevState: State, formData: FormData) {
-  const validatedFields = UpdateStaff.safeParse({
-    id: formData.get('id'),
-    name: formData.get('name'),
-    hourlyRate: formData.get('hourlyRate'),
-  });
-
-  if (!validatedFields.success) {
-    return {
-      errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Missing Fields. Failed to Update Staff.',
-    };
-  }
-
-  const { id, name, hourlyRate } = validatedFields.data;
-
-  const { firestore } = initializeFirebase();
-  const staffDocRef = doc(firestore, 'staff', id!);
-
-  try {
-    const updateData: Partial<Staff> = {};
-    if (name) updateData.name = name;
-    if (hourlyRate) updateData.hourlyRate = hourlyRate;
-
-    await setDoc(staffDocRef, updateData, { merge: true });
-
-    revalidatePath('/admin');
-    return { message: 'Staff member updated successfully.' };
-  } catch (e: any) {
-    return {
-      message: `Database Error: Failed to update staff member. ${e.message}`,
-    };
-  }
+   console.log('updateStaff called, but database is removed.');
+  return { message: 'Staff member updated (simulation).' };
 }
 
 export async function deleteStaff(staffId: string) {
-  const { firestore } = initializeFirebase();
-  try {
-    const batch = writeBatch(firestore);
+   console.log('deleteStaff called, but database is removed.');
+   return { message: 'Staff member deleted (simulation).' };
+}
 
-    const staffDocRef = doc(firestore, 'staff', staffId);
-    batch.delete(staffDocRef);
+export async function addAdvance(prevState: State, formData: FormData) {
+  console.log('addAdvance called, but database is removed.');
+  return { message: 'Advance added (simulation).' };
+}
 
-    const attendanceRecordsRef = collection(firestore, `staff/${staffId}/attendance_records`);
-    const attendanceRecordsSnapshot = await getDocs(attendanceRecordsRef);
-    attendanceRecordsSnapshot.forEach(doc => batch.delete(doc.ref));
-
-    const advancePaymentsRef = collection(firestore, `staff/${staffId}/advance_payments`);
-    const advancePaymentsSnapshot = await getDocs(advancePaymentsRef);
-    advancePaymentsSnapshot.forEach(doc => batch.delete(doc.ref));
-    
-    const salariesRef = collection(firestore, `staff/${staffId}/salaries`);
-    const salariesSnapshot = await getDocs(salariesRef);
-    salariesSnapshot.forEach(doc => batch.delete(doc.ref));
-
-    await batch.commit();
-
-    revalidatePath('/admin');
-    return { message: 'Staff member and all their data deleted successfully.' };
-  } catch (error) {
-    console.error("Failed to delete staff member:", error);
-    return { message: 'Database Error: Failed to Delete Staff Member.' };
-  }
+export async function addAttendance(prevState: State, formData: FormData) {
+    console.log('addAttendance called, but database is removed.');
+    return { message: 'Attendance added (simulation).' };
 }

@@ -26,14 +26,9 @@ import {
   Hourglass,
   UserSearch,
 } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import {
-  collection,
-  query,
-  where,
-  collectionGroup,
-} from 'firebase/firestore';
 import { calculateWorkingHours } from '@/lib/utils';
+import { MOCK_STAFF, MOCK_ATTENDANCE, MOCK_ADVANCES } from '@/lib/data';
+
 
 interface SalaryData {
   staffId: string;
@@ -46,37 +41,11 @@ interface SalaryData {
 }
 
 export default function SalaryPage() {
-  const firestore = useFirestore();
-  const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(
-    null
-  );
-  
-  const staffCollection = useMemoFirebase(() => {
-    return collection(firestore, 'staff');
-  }, [firestore]);
-  const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(
-    staffCollection
-  );
+  const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
 
-  const attendanceCollectionGroup = useMemoFirebase(() => {
-    if (!selectedStaffId) return null;
-    return query(
-      collectionGroup(firestore, 'attendance_records'),
-      where('staffId', '==', selectedStaffId)
-    );
-  }, [firestore, selectedStaffId]);
-  const { data: attendance, isLoading: isLoadingAttendance } =
-    useCollection<AttendanceRecord>(attendanceCollectionGroup);
-
-  const advancePaymentsCollectionGroup = useMemoFirebase(() => {
-    if (!selectedStaffId) return null;
-    return query(
-      collectionGroup(firestore, 'advance_payments'),
-      where('staffId', '==', selectedStaffId)
-    );
-  }, [firestore, selectedStaffId]);
-  const { data: advances, isLoading: isLoadingAdvances } =
-    useCollection<AdvancePayment>(advancePaymentsCollectionGroup);
+  const [staff] = React.useState<Staff[]>(MOCK_STAFF);
+  const [allAttendance] = React.useState<AttendanceRecord[]>(MOCK_ATTENDANCE);
+  const [allAdvances] = React.useState<AdvancePayment[]>(MOCK_ADVANCES);
 
   const handleStaffSelection = (staffId: string) => {
     setSelectedStaffId(staffId);
@@ -86,7 +55,10 @@ export default function SalaryPage() {
 
   let salaryData: SalaryData | null = null;
 
-  if (selectedStaffId && selectedStaffInfo && attendance && advances) {
+  if (selectedStaffId && selectedStaffInfo) {
+    const attendance = allAttendance.filter(a => a.staffId === selectedStaffId);
+    const advances = allAdvances.filter(a => a.staffId === selectedStaffId);
+
     const totalHours = attendance.reduce((acc, record) => {
       const hours1 =
         record.checkIn && record.checkOut
@@ -118,8 +90,6 @@ export default function SalaryPage() {
     };
   }
 
-  const isLoadingData =
-    (isLoadingAttendance || isLoadingAdvances) && !!selectedStaffId;
 
   return (
     <div className="space-y-6">
@@ -135,7 +105,6 @@ export default function SalaryPage() {
             <Select
               onValueChange={handleStaffSelection}
               value={selectedStaffId ?? ''}
-              disabled={isLoadingStaff}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select staff" />
@@ -153,11 +122,7 @@ export default function SalaryPage() {
         </CardHeader>
       </Card>
       
-      {isLoadingData ? (
-        <div className="flex justify-center p-12">
-            <p>Loading salary data...</p>
-        </div>
-      ) : salaryData ? (
+      {salaryData ? (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           <Card key={salaryData.staffId} className="flex flex-col">
             <CardHeader>

@@ -46,8 +46,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import type { Staff } from '@/lib/definitions';
 import { PlusCircle, Edit, Trash2, UserPlus } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { MOCK_STAFF } from '@/lib/data';
+
 
 function AddStaffSubmitButton() {
   const { pending } = useFormStatus();
@@ -72,21 +72,13 @@ export default function AdminPage() {
   const addFormRef = React.useRef<HTMLFormElement>(null);
   const editFormRef = React.useRef<HTMLFormElement>(null);
   const [isEditDialogOpen, setEditDialogOpen] = React.useState(false);
-  
+  const [staff, setStaff] = React.useState<Staff[]>(MOCK_STAFF);
+
   const addInitialState: State = { message: null, errors: {} };
   const [addState, addDispatch] = useActionState(addStaff, addInitialState);
 
   const updateInitialState: State = { message: null, errors: {} };
   const [updateState, updateDispatch] = useActionState(updateStaff, updateInitialState);
-
-  const firestore = useFirestore();
-  
-  const staffCollection = useMemoFirebase(() => {
-    return collection(firestore, 'staff');
-  }, [firestore]);
-
-  const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
-
 
   React.useEffect(() => {
     if (addState.message) {
@@ -119,7 +111,6 @@ export default function AdminPage() {
     }
   }
 
-  if (isLoadingStaff) return <p>Loading staff...</p>;
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
