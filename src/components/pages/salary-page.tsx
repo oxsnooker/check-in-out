@@ -42,7 +42,7 @@ import {
   useMemoFirebase,
   useUser
 } from '@/firebase';
-import { collection, query, where, Timestamp } from 'firebase/firestore';
+import { collection, query, where, Timestamp, collectionGroup } from 'firebase/firestore';
 
 
 interface SalaryData {
@@ -83,7 +83,7 @@ export default function SalaryPage() {
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !selectedStaffId || !isVerified) return null;
     return query(
-      collection(firestore, 'attendance'),
+      collection(firestore, `staff/${selectedStaffId}/attendance_records`),
       where('staffId', '==', selectedStaffId)
     );
   }, [firestore, selectedStaffId, isVerified]);
@@ -93,7 +93,7 @@ export default function SalaryPage() {
   const advancesQuery = useMemoFirebase(() => {
     if (!firestore || !selectedStaffId || !isVerified) return null;
     return query(
-      collection(firestore, 'advance_payments'),
+      collection(firestore, `staff/${selectedStaffId}/advance_payments`),
       where('staffId', '==', selectedStaffId)
     );
   }, [firestore, selectedStaffId, isVerified]);

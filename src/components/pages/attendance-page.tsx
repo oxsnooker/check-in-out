@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, toDate } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { calculateWorkingHours } from '@/lib/utils';
 import {
@@ -9,7 +9,7 @@ import {
   useCollection,
   useMemoFirebase,
 } from '@/firebase';
-import { collection, query, where, Timestamp, setDoc, doc, getDocs, updateDoc } from 'firebase/firestore';
+import { collection, query, where, Timestamp, setDoc, doc, updateDoc } from 'firebase/firestore';
 
 import {
   Card,
@@ -62,8 +62,7 @@ export default function AttendancePage() {
     const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
     const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
     return query(
-      collection(firestore, 'attendance'),
-      where('staffId', '==', selectedStaffId),
+      collection(firestore, `staff/${selectedStaffId}/attendance_records`),
       where('checkIn', '>=', startDate),
       where('checkIn', '<=', endDate)
     );
@@ -113,19 +112,22 @@ export default function AttendancePage() {
       const [hours, minutes] = time.split(':');
       const newDateTime = new Date(day);
       newDateTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+      
+      const dayId = format(day, 'yyyyMMdd');
 
       if (existingRecord) {
         // Update existing record
-        const recordRef = doc(firestore, 'attendance', existingRecord.id);
+        const recordRef = doc(firestore, `staff/${selectedStaffId}/attendance_records`, existingRecord.id);
         await updateDoc(recordRef, { [field]: Timestamp.fromDate(newDateTime) });
       } else {
-        // Create new record
-        const newRecordRef = doc(collection(firestore, 'attendance'));
+        // Create new record with a predictable ID based on date
+        const newRecordRef = doc(firestore, `staff/${selectedStaffId}/attendance_records`, dayId);
         await setDoc(newRecordRef, {
             id: newRecordRef.id,
             staffId: selectedStaffId,
+            date: Timestamp.fromDate(day),
             [field]: Timestamp.fromDate(newDateTime)
-        });
+        }, { merge: true });
       }
 
       toast({

@@ -49,7 +49,7 @@ export default function AdvancePage() {
   const paymentsQuery = useMemoFirebase(() => {
     if (!firestore || !selectedStaffId) return null;
     return query(
-      collection(firestore, 'advance_payments'),
+      collection(firestore, `staff/${selectedStaffId}/advance_payments`),
       where('staffId', '==', selectedStaffId)
     );
   }, [firestore, selectedStaffId]);

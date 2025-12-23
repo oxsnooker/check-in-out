@@ -7,11 +7,17 @@ import {
   doc,
   collection,
   writeBatch,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  addDoc,
+  query,
+  where,
+  getDocs
 } from 'firebase/firestore';
 import {
   getAuth,
   createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
 } from 'firebase/auth';
@@ -194,8 +200,10 @@ export async function addAdvance(prevState: State, formData: FormData) {
 
   try {
     const { firestore } = initializeFirebase();
-    const advanceCollection = collection(firestore, 'advance_payments');
-    await addDoc(advanceCollection, {
+    const advanceCollection = collection(firestore, `staff/${staffId}/advance_payments`);
+    const newDocRef = doc(advanceCollection);
+    await setDoc(newDocRef, {
+        id: newDocRef.id,
         staffId,
         amount,
         date: new Date(date as string),
@@ -216,14 +224,14 @@ export async function upsertAttendance(staffId: string, recordDate: Date, field:
         const newDateTime = new Date(recordDate);
         newDateTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
 
-        const attendanceCol = collection(firestore, `attendance`);
+        const attendanceCol = collection(firestore, `staff/${staffId}/attendance_records`);
         const q = query(attendanceCol, where("staffId", "==", staffId), where("recordDate", "==", recordDate));
         
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
             // Create new record
-            const newRecordRef = doc(collection(firestore, 'attendance'));
+            const newRecordRef = doc(collection(firestore, `staff/${staffId}/attendance_records`));
             await setDoc(newRecordRef, {
                 staffId: staffId,
                 recordDate: recordDate,
