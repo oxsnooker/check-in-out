@@ -1,0 +1,151 @@
+/**
+ * This ruleset enforces a strict staff-ownership model for a payroll and attendance application.
+ *
+ * Core Philosophy:
+ * The security model is centered around the "staff member" as the owner of their data.
+ * An authenticated user's UID is expected to match the `staffId` in the path, granting them
+ * exclusive access to their personal information, attendance records, payments, and salaries.
+ * This ensures that staff members can only see and manage their own data.
+ *
+ * Data Structure:
+ * All data is hierarchically organized under the `/staff/{staffId}` path. This top-level
+ * document contains the staff member's profile. Nested subcollections for `attendance_records`,
+ * `advance_payments`, and `salaries` store related data, inheriting ownership from the
+ * parent `staffId`.
+ *
+ * Key Security Decisions:
+ * - Staff Data Privacy: A staff member can only access documents within their own data tree
+ *   (i.e., where the path's `staffId` matches their authenticated UID).
+ * - No Staff Enumeration: Listing the entire `/staff` collection is explicitly disallowed
+ *   to prevent any user from discovering the list of all other staff members.
+ * - Relational Integrity: On creation, documents within subcollections (e.g., an attendance record)
+ *   must include a `staffId` field that matches the `staffId` in the document path. This field
+ *   is enforced as immutable to maintain a permanent, unbreakable link to the parent staff member.
+ * - Prototyping Flexibility: While authorization is strict, these rules do not validate the
+ *   specific shape or data types of documents beyond the fields essential for security. This allows
+ *   the application's data model to evolve without requiring constant rule updates.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the currently authenticated user's UID matches the provided userId.
+     * This is the primary function for verifying document ownership.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Checks for ownership on an existing document. Used for update and delete
+     * operations to prevent modifications to non-existent documents.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * Validates that the incoming document on creation contains a `staffId`
+     * that matches the `staffId` from the document path.
+     * @principle Enforces relational integrity on create.
+     */
+    function hasValidStaffIdOnCreate(staffId) {
+      return request.resource.data.staffId == staffId;
+    }
+
+    /**
+     * Validates that the `staffId` field cannot be changed during an update.
+     * @principle Enforces immutability of critical ownership fields.
+     */
+    function isStaffIdImmutable() {
+      return request.resource.data.staffId == resource.data.staffId;
+    }
+
+    // ------------------------------------------------------------------------
+    // Collection Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Manages staff member profile documents. Each staff member can create their
+     *              own profile and manage it, but cannot see other staff profiles.
+     * @path        /staff/{staffId}
+     * @allow       (create) A new user with UID 'staff123' creating their own profile at `/staff/staff123`.
+     * @deny        (list) Any user trying to list all documents in the `/staff` collection.
+     * @deny        (get) User 'staff456' trying to read the document at `/staff/staff123`.
+     * @principle   Restricts access to a user's own data tree and prevents user enumeration.
+     */
+    match /staff/{staffId} {
+      allow get: if isOwner(staffId);
+      allow list: if false;
+      allow create: if isOwner(staffId);
+      allow update: if isExistingOwner(staffId);
+      allow delete: if isExistingOwner(staffId);
+
+      /**
+       * @description Manages attendance records for a specific staff member. Only the staff
+       *              member can create, view, or modify their own attendance records.
+       * @path        /staff/{staffId}/attendance_records/{attendanceRecordId}
+       * @allow       (create) User 'staff123' creating an attendance record in their own subcollection.
+       * @allow       (list) User 'staff123' listing all of their own attendance records.
+       * @deny        (create) User 'staff456' trying to create a record under `/staff/staff123/...`.
+       * @deny        (update) User 'staff123' trying to change the `staffId` on an existing record.
+       * @principle   Enforces document ownership via path and validates relational integrity.
+       */
+      match /attendance_records/{attendanceRecordId} {
+        allow get: if isOwner(staffId);
+        allow list: if isOwner(staffId);
+        allow create: if isOwner(staffId) && hasValidStaffIdOnCreate(staffId);
+        allow update: if isExistingOwner(staffId) && isStaffIdImmutable();
+        allow delete: if isExistingOwner(staffId);
+      }
+
+      /**
+       * @description Manages advance payment records for a specific staff member. Only the
+       *              staff member can manage their own payment records.
+       * @path        /staff/{staffId}/advance_payments/{advancePaymentId}
+       * @allow       (get) User 'staff123' reading one of their advance payment records.
+       * @allow       (list) User 'staff123' listing all of their own advance payment records.
+       * @deny        (list) User 'staff456' trying to list records from `/staff/staff123/advance_payments`.
+       * @deny        (create) A record is created where the `staffId` in the data does not match `staffId` in the path.
+       * @principle   Enforces document ownership via path and validates relational integrity.
+       */
+      match /advance_payments/{advancePaymentId} {
+        allow get: if isOwner(staffId);
+        allow list: if isOwner(staffId);
+        allow create: if isOwner(staffId) && hasValidStaffIdOnCreate(staffId);
+        allow update: if isExistingOwner(staffId) && isStaffIdImmutable();
+        allow delete: if isExistingOwner(staffId);
+      }
+
+      /**
+       * @description Manages salary records for a specific staff member. Only the staff
+       *              member can view or manage their own salary history.
+       * @path        /staff/{staffId}/salaries/{salaryId}
+       * @allow       (create) User 'staff123' creating a salary record for themselves.
+       * @allow       (delete) User 'staff123' deleting one of their own salary records.
+       * @deny        (update) User 'staff456' attempting to modify a salary record for 'staff123'.
+       * @deny        (update) User 'staff123' trying to change the `staffId` on an existing salary record.
+       * @principle   Enforces document ownership via path and validates relational integrity.
+       */
+      match /salaries/{salaryId} {
+        allow get: if isOwner(staffId);
+        allow list: if isOwner(staffId);
+        allow create: if isOwner(staffId) && hasValidStaffIdOnCreate(staffId);
+        allow update: if isExistingOwner(staffId) && isStaffIdImmutable();
+        allow delete: if isExistingOwner(staffId);
+      }
+    }
+  }
+}
