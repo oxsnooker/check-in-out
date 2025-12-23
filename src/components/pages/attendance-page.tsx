@@ -5,7 +5,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { addAttendance, type State } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Timestamp, collection, query, where } from 'firebase/firestore';
 
 import {
@@ -56,6 +56,7 @@ export default function AttendancePage() {
   const [state, dispatch] = useActionState(addAttendance, initialState);
 
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());
 
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
@@ -68,10 +69,18 @@ export default function AttendancePage() {
 
   const attendanceCollection = useMemoFirebase(() => {
     if (!user || !selectedStaffId) return null;
-    return query(collection(firestore, `staff/${selectedStaffId}/attendance_records`));
-  }, [firestore, user, selectedStaffId]);
-  const { data: records, isLoading: isLoadingRecords } = useCollection<AttendanceRecord>(attendanceCollection);
+    const year = new Date().getFullYear();
+    const startDate = startOfMonth(new Date(year, selectedMonth));
+    const endDate = endOfMonth(new Date(year, selectedMonth));
 
+    return query(
+        collection(firestore, `staff/${selectedStaffId}/attendance_records`),
+        where('checkIn', '>=', Timestamp.fromDate(startDate)),
+        where('checkIn', '<=', Timestamp.fromDate(endDate))
+    );
+  }, [firestore, user, selectedStaffId, selectedMonth]);
+
+  const { data: records, isLoading: isLoadingRecords } = useCollection<AttendanceRecord>(attendanceCollection);
 
   React.useEffect(() => {
     if (state.message) {
@@ -101,6 +110,11 @@ export default function AttendancePage() {
   }
 
   const toDate = (date: Date | Timestamp) => (date instanceof Timestamp ? date.toDate() : date);
+
+  const monthOptions = Array.from({ length: 12 }, (_, i) => ({
+    value: i,
+    label: format(new Date(0, i), 'MMMM'),
+  }));
 
 
   return (
@@ -173,11 +187,23 @@ export default function AttendancePage() {
 
       <div className="lg:col-span-2">
         <Card>
-          <CardHeader>
-            <CardTitle>Attendance History</CardTitle>
-            <CardDescription>
-              {selectedStaffId ? `Showing records for ${staff.find(s => s.id === selectedStaffId)?.name}` : 'Select a staff member to see their history.'}
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div className='space-y-1.5'>
+                <CardTitle>Attendance History</CardTitle>
+                <CardDescription>
+                  {selectedStaffId ? `Showing records for ${staff.find(s => s.id === selectedStaffId)?.name}` : 'Select a staff member to see their history.'}
+                </CardDescription>
+            </div>
+             <Select onValueChange={(value) => setSelectedMonth(Number(value))} value={String(selectedMonth)}>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select month" />
+                </SelectTrigger>
+                <SelectContent>
+                    {monthOptions.map((month) => (
+                        <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
           </CardHeader>
           <CardContent>
             <Table>
@@ -215,7 +241,7 @@ export default function AttendancePage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center">
-                      No attendance records found for this staff member.
+                      No attendance records found for this staff member for the selected month.
                     </TableCell>
                   </TableRow>
                 )}
