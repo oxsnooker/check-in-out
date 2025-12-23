@@ -1,3 +1,5 @@
+import { Timestamp } from 'firebase/firestore';
+
 export interface Staff {
   id: string;
   name: string;
@@ -9,17 +11,17 @@ export interface Staff {
 export interface AttendanceRecord {
   id: string;
   staffId: string;
-  checkIn: Date;
-  checkOut: Date;
-  checkIn2?: Date;
-  checkOut2?: Date;
-  createdAt?: Date;
+  checkIn: Timestamp | Date;
+  checkOut?: Timestamp | Date;
+  checkIn2?: Timestamp | Date;
+  checkOut2?: Timestamp | Date;
+  createdAt?: Timestamp;
 }
 
 export interface AdvancePayment {
   id: string;
   staffId: string;
   amount: number;
-  date: Date;
-  createdAt?: Date;
+  date: Timestamp | Date;
+  createdAt?: Timestamp;
 }

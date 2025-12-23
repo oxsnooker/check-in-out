@@ -11,23 +11,27 @@ import {
 } from '@/components/ui/sidebar';
 import { NavItems } from './nav-items';
 import { TimerIcon } from 'lucide-react';
-import { PageHeader } from './page-header';
-
+import { UserNav } from './user-nav';
+import { useUser } from '@/firebase';
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
+    const { user } = useUser();
   return (
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <TimerIcon className="size-6" />
+          <div className="flex items-center justify-between">
+             <div className="flex items-center gap-3">
+                <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <TimerIcon className="size-6" />
+                </div>
+                <div className="flex flex-col">
+                <span className="text-lg font-semibold tracking-tight text-sidebar-foreground">
+                    TimeTrack Pro
+                </span>
+                </div>
             </div>
-            <div className="flex flex-col">
-              <span className="text-lg font-semibold tracking-tight text-sidebar-foreground">
-                TimeTrack Pro
-              </span>
-            </div>
+             {user && <UserNav user={user} />}
           </div>
         </SidebarHeader>
         <SidebarContent>
