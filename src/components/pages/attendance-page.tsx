@@ -4,6 +4,7 @@ import * as React from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDate, isSameDay } from 'date-fns';
 import { Timestamp, collection, query, where, doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { calculateWorkingHours } from '@/lib/utils';
 
 import {
   Card,
@@ -182,18 +183,19 @@ export default function AttendancePage() {
                 <TableHead>Date</TableHead>
                 <TableHead>Check In</TableHead>
                 <TableHead>Check Out</TableHead>
+                <TableHead>Total Hours</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoadingRecords ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center">
+                  <TableCell colSpan={4} className="text-center">
                     Loading records...
                   </TableCell>
                 </TableRow>
               ) : !selectedStaffId ? (
                   <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center">
+                  <TableCell colSpan={4} className="h-24 text-center">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <UserSearch className="size-8 text-muted-foreground" />
                       <p className="text-muted-foreground">Please select a staff member.</p>
@@ -203,6 +205,7 @@ export default function AttendancePage() {
               ) : daysInMonth.length > 0 ? (
                 daysInMonth.map((day) => {
                   const record = attendanceMap.get(format(day, 'yyyy-MM-dd'));
+                  const totalHours = record ? calculateWorkingHours(record.checkIn, record.checkOut) : 0;
                   return (
                     <TableRow key={day.toISOString()}>
                       <TableCell>{format(day, 'MMM d, yyyy')}</TableCell>
@@ -222,12 +225,15 @@ export default function AttendancePage() {
                             className="w-[120px]"
                          />
                       </TableCell>
+                      <TableCell>
+                        <span className="font-medium">{totalHours.toFixed(2)} hrs</span>
+                      </TableCell>
                     </TableRow>
                   );
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center">
+                  <TableCell colSpan={4} className="text-center">
                     No attendance records found for this staff member for the selected month.
                   </TableCell>
                 </TableRow>
