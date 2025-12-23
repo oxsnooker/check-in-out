@@ -102,15 +102,18 @@ export async function verifyStaffPassword(prevState: State, formData: FormData) 
     
     const { email, password } = validatedFields.data;
     const { auth } = initializeFirebase();
+    const user = auth.currentUser;
 
-    // We can't directly verify a password for another user on the client.
-    // A secure way would be a custom backend function.
-    // As a workaround, we'll try to sign in with the credentials. This is NOT ideal
-    // as it might sign out the current admin user if successful.
-    // A better approach would require a backend (e.g. Cloud Function).
+    if (!user || user.email !== email) {
+      return {
+        errors: { password: ['Verification context error.'] },
+        message: 'Verification failed.',
+      };
+    }
+    
     try {
-        // This is a temporary verification method.
-        await signInWithEmailAndPassword(auth, email!, password);
+        const credential = EmailAuthProvider.credential(user.email, password);
+        await reauthenticateWithCredential(user, credential);
         return { message: 'Verification successful.' };
     } catch (e: any) {
          return {
