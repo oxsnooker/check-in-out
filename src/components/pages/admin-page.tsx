@@ -141,6 +141,11 @@ export default function AdminPage() {
                  {addState.errors?.name && <p className="text-sm font-medium text-destructive">{addState.errors.name}</p>}
               </div>
               <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" name="email" type="email" placeholder="john.doe@example.com" />
+                {addState.errors?.email && <p className="text-sm font-medium text-destructive">{addState.errors.email}</p>}
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="hourlyRate">Hourly Rate ($)</Label>
                 <Input id="hourlyRate" name="hourlyRate" type="number" step="0.01" placeholder="20.00" />
                 {addState.errors?.hourlyRate && <p className="text-sm font-medium text-destructive">{addState.errors.hourlyRate}</p>}
@@ -243,5 +248,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    

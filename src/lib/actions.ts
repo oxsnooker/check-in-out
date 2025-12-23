@@ -48,7 +48,7 @@ const FormSchema = z.object({
   password: z
     .string()
     .min(6, { message: 'Password must be at least 6 characters.' }),
-  email: z.string().email({ message: 'Please enter a valid email.' }).optional(),
+  email: z.string().email({ message: 'Please enter a valid email.' }),
   date: z.string().optional(),
 });
 
@@ -60,7 +60,7 @@ const AddAttendance = FormSchema.pick({
   checkOut: true,
 });
 const AddAdvance = FormSchema.pick({ staffId: true, amount: true, date: true });
-const AddStaff = FormSchema.pick({ name: true, hourlyRate: true, password: true });
+const AddStaff = FormSchema.pick({ name: true, email: true, hourlyRate: true, password: true });
 const UpdateStaff = FormSchema.pick({
   id: true,
   name: true,
@@ -263,6 +263,7 @@ export async function addAdvance(prevState: State, formData: FormData) {
 export async function addStaff(prevState: State, formData: FormData) {
   const validatedFields = AddStaff.safeParse({
     name: formData.get('name'),
+    email: formData.get('email'),
     hourlyRate: formData.get('hourlyRate'),
     password: formData.get('password'),
   });
@@ -274,16 +275,15 @@ export async function addStaff(prevState: State, formData: FormData) {
     };
   }
 
-  const { name, hourlyRate, password } = validatedFields.data;
+  const { name, email, hourlyRate, password } = validatedFields.data;
 
   const { firestore, auth } = initializeFirebase();
-  const email = `${name!.replace(/\s+/g, '.').toLowerCase()}@timetrack.pro`;
 
   try {
     const userCredential = await createUserWithEmailAndPassword(
       auth,
       email,
-      password!
+      password
     );
     const user = userCredential.user;
 
