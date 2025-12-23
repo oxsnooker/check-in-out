@@ -34,6 +34,11 @@ const FormSchema = z.object({
   date: z.string().optional(),
 });
 
+const VerifyPasswordSchema = z.object({
+  password: z.string().min(1, { message: 'Password is required.' }),
+});
+
+
 export type State = {
   errors?: {
     staffId?: string[];
@@ -74,4 +79,22 @@ export async function addAdvance(prevState: State, formData: FormData) {
 export async function addAttendance(prevState: State, formData: FormData) {
     console.log('addAttendance called, but database is removed.');
     return { message: 'Attendance added (simulation).' };
+}
+
+export async function verifyPassword(prevState: State, formData: FormData) {
+  console.log('verifyPassword called, but database is removed. Simulating success.');
+  const validatedFields = VerifyPasswordSchema.safeParse({
+    password: formData.get('password'),
+  });
+
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: 'Password is required.',
+    };
+  }
+
+  // In a real app, you would verify the password against the current user's credentials.
+  // Since auth is removed, we'll just simulate a successful verification.
+  return { message: 'Verification successful.' };
 }
