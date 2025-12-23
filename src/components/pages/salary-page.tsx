@@ -220,7 +220,7 @@ export default function SalaryPage() {
                     </DialogDescription>
                 </DialogHeader>
                 <form action={dispatch}>
-                    <input type="hidden" name="email" value={user?.email ?? ''} />
+                    <input type="hidden" name="email" value={selectedStaffForDialog?.email ?? ''} />
                     <div className="space-y-4 py-4">
                         <div className="space-y-2">
                             <Label htmlFor="password">Password</Label>
