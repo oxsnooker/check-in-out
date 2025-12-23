@@ -59,14 +59,6 @@ export default function AttendancePage() {
 
   const { data: records, isLoading: isLoadingRecords } = useCollection<AttendanceRecord>(attendanceCollection);
   
-  if (isUserLoading || isLoadingStaff) {
-    return <SimpleLogin title="Attendance" description="Please sign in to manage attendance." />;
-  }
-  
-  if (!user || !staff) {
-     return <SimpleLogin title="Attendance" description="Please sign in to manage attendance." />;
-  }
-
   const toDate = (date: Date | Timestamp) => (date instanceof Timestamp ? date.toDate() : date);
 
   const monthOptions = Array.from({ length: 12 }, (_, i) => ({
@@ -89,6 +81,13 @@ export default function AttendancePage() {
     return map;
   }, [records]);
 
+  if (isUserLoading || isLoadingStaff) {
+    return <SimpleLogin title="Attendance" description="Please sign in to manage attendance." />;
+  }
+  
+  if (!user || !staff) {
+     return <SimpleLogin title="Attendance" description="Please sign in to manage attendance." />;
+  }
 
   return (
     <div className="grid grid-cols-1 gap-8">
