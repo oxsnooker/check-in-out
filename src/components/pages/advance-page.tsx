@@ -6,7 +6,7 @@ import { useFormStatus } from 'react-dom';
 import { addAdvance, type State } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { Timestamp, collection, collectionGroup } from 'firebase/firestore';
+import { Timestamp, collection, collectionGroup, query, where } from 'firebase/firestore';
 
 import {
   Card,
@@ -34,29 +34,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { Staff, AdvancePayment } from '@/lib/definitions';
-import { Calendar, DollarSign, Send } from 'lucide-react';
+import { Calendar, DollarSign, Send, UserSearch } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { SimpleLogin } from '@/components/simple-login';
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={pending} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-      {pending ? 'Submitting...' : 'Submit Payment'}
-      <Send className="ml-2 size-4" />
-    </Button>
-  );
-}
 
 export default function AdvancePage() {
-  const { toast } = useToast();
-  const formRef = React.useRef<HTMLFormElement>(null);
-  
-  const initialState: State = { message: null, errors: {} };
-  const [state, dispatch] = useActionState(addAdvance, initialState);
-  
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
-
+  
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
 
@@ -66,98 +51,48 @@ export default function AdvancePage() {
   }, [firestore, user]);
   const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
 
-  const advancePaymentsCollectionGroup = useMemoFirebase(() => {
-    if (!user) return null;
-    return collectionGroup(firestore, 'advance_payments');
-  }, [firestore, user]);
-  const { data: initialPayments, isLoading: isLoadingPayments } = useCollection<AdvancePayment>(advancePaymentsCollectionGroup);
+  const advancePaymentsCollection = useMemoFirebase(() => {
+    if (!user || !selectedStaffId) return null;
+    return query(
+      collection(firestore, `staff/${selectedStaffId}/advance_payments`)
+    );
+  }, [firestore, user, selectedStaffId]);
 
-  React.useEffect(() => {
-    if (state.message) {
-      if (state.errors && Object.keys(state.errors).length > 0) {
-        toast({ title: 'Error', description: state.message, variant: 'destructive' });
-      } else {
-        toast({ title: 'Success', description: state.message });
-        formRef.current?.reset();
-        setSelectedStaffId(null);
-      }
-    }
-  }, [state, toast]);
+  const { data: payments, isLoading: isLoadingPayments } = useCollection<AdvancePayment>(advancePaymentsCollection);
 
-  if (isUserLoading || isLoadingStaff || isLoadingPayments) {
+
+  if (isUserLoading || isLoadingStaff ) {
     return <SimpleLogin title="Advance Payments" description="Please sign in to manage advance payments." />;
   }
   
-  if (!user || !staff || !initialPayments) {
+  if (!user || !staff) {
      return <SimpleLogin title="Advance Payments" description="Please sign in to manage advance payments." />;
   }
-
-  const filteredPayments = selectedStaffId
-    ? initialPayments.filter((p) => p.staffId === selectedStaffId)
-    : initialPayments;
 
   const toDate = (date: Date | Timestamp) => (date instanceof Timestamp ? date.toDate() : date);
 
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-      <div className="lg:col-span-1">
-        <Card>
-          <CardHeader>
-            <CardTitle>Record Advance</CardTitle>
-            <CardDescription>
-              Log an advance payment for a staff member.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form ref={formRef} action={dispatch} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="staffId">Staff Member</Label>
-                <Select name="staffId" onValueChange={setSelectedStaffId} value={selectedStaffId ?? undefined}>
-                  <SelectTrigger id="staffId">
-                    <SelectValue placeholder="Select staff" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {staff.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+    <div className="grid grid-cols-1 gap-8">
+      <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div className='space-y-1.5'>
+                <CardTitle>Payment History</CardTitle>
+                <CardDescription>
+                {selectedStaffId ? `Showing payments for ${staff.find(s => s.id === selectedStaffId)?.name}` : 'Select a staff member to see their history.'}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-4">
+                 <Select onValueChange={setSelectedStaffId} value={selectedStaffId ?? ''}>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Select staff" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {staff.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                    </SelectContent>
                 </Select>
-                 {state.errors?.staffId && <p className="text-sm font-medium text-destructive">{state.errors.staffId}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="amount">Amount</Label>
-                <div className="relative">
-                  <Input id="amount" name="amount" type="number" step="0.01" placeholder="0.00" className="pl-10" />
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                </div>
-                {state.errors?.amount && <p className="text-sm font-medium text-destructive">{state.errors.amount}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="date">Payment Date</Label>
-                <div className="relative">
-                  <Input id="date" name="date" type="date" className="pl-10" defaultValue={format(new Date(), 'yyyy-MM-dd')} />
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                </div>
-                {state.errors?.date && <p className="text-sm font-medium text-destructive">{state.errors.date}</p>}
-              </div>
-
-              <SubmitButton />
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="lg:col-span-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment History</CardTitle>
-             <CardDescription>
-              {selectedStaffId ? `Showing payments for ${staff.find(s => s.id === selectedStaffId)?.name}` : 'Showing all recent payments.'}
-            </CardDescription>
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
@@ -169,8 +104,23 @@ export default function AdvancePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPayments.length > 0 ? (
-                  filteredPayments.map((payment) => (
+                {isLoadingPayments ? (
+                   <TableRow>
+                    <TableCell colSpan={3} className="text-center">
+                      Loading records...
+                    </TableCell>
+                  </TableRow>
+                ) : !selectedStaffId ? (
+                   <TableRow>
+                    <TableCell colSpan={3} className="h-24 text-center">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <UserSearch className="size-8 text-muted-foreground" />
+                        <p className="text-muted-foreground">Please select a staff member.</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : payments && payments.length > 0 ? (
+                  payments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell>{staff.find((s) => s.id === payment.staffId)?.name}</TableCell>
                       <TableCell>{format(toDate(payment.date), 'MMM d, yyyy')}</TableCell>
@@ -182,7 +132,7 @@ export default function AdvancePage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center">
-                      No advance payments found.
+                      No advance payments found for this staff member.
                     </TableCell>
                   </TableRow>
                 )}
@@ -190,7 +140,6 @@ export default function AdvancePage() {
             </Table>
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }
