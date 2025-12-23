@@ -133,6 +133,11 @@ export default function AdminPage() {
                 {addState.errors?.email && <p className="text-sm font-medium text-destructive">{addState.errors.email}</p>}
               </div>
               <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input id="password" name="password" type="password" />
+                {addState.errors?.password && <p className="text-sm font-medium text-destructive">{addState.errors.password}</p>}
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="hourlyRate">Hourly Rate ($)</Label>
                 <Input id="hourlyRate" name="hourlyRate" type="number" step="0.01" placeholder="20.00" />
                 {addState.errors?.hourlyRate && <p className="text-sm font-medium text-destructive">{addState.errors.hourlyRate}</p>}
