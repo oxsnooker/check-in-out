@@ -13,6 +13,8 @@ export interface AttendanceRecord {
   staffId: string;
   checkIn: Date | Timestamp;
   checkOut: Date | Timestamp;
+  checkIn2?: Date | Timestamp;
+  checkOut2?: Date | Timestamp;
   createdAt?: Date | Timestamp;
 }
 

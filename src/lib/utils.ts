@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { differenceInHours } from 'date-fns';
+import { differenceInMinutes } from 'date-fns';
 import { Timestamp } from 'firebase/firestore';
 
 export function cn(...inputs: ClassValue[]) {
@@ -15,5 +15,6 @@ export function calculateWorkingHours(checkIn: Date | Timestamp, checkOut: Date 
   if (!checkInDate || !checkOutDate || checkOutDate < checkInDate) {
     return 0;
   }
-  return differenceInHours(checkOutDate, checkInDate);
+  const diffMinutes = differenceInMinutes(checkOutDate, checkInDate);
+  return diffMinutes / 60;
 }
