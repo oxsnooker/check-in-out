@@ -45,6 +45,7 @@ function combineDateAndTime(date: Date, time: string): Date {
 export default function AttendancePage() {
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear());
   const { toast } = useToast();
 
   const { user, isUserLoading } = useUser();
@@ -58,16 +59,16 @@ export default function AttendancePage() {
 
   const attendanceCollection = useMemoFirebase(() => {
     if (!user || !selectedStaffId) return null;
-    const year = new Date().getFullYear();
-    const startDate = startOfMonth(new Date(year, selectedMonth));
-    const endDate = endOfMonth(new Date(year, selectedMonth));
+    
+    const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
+    const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
 
     return query(
         collection(firestore, `staff/${selectedStaffId}/attendance_records`),
         where('checkIn', '>=', Timestamp.fromDate(startDate)),
         where('checkIn', '<=', Timestamp.fromDate(endDate))
     );
-  }, [firestore, user, selectedStaffId, selectedMonth]);
+  }, [firestore, user, selectedStaffId, selectedMonth, selectedYear]);
 
   const { data: records, isLoading: isLoadingRecords } = useCollection<AttendanceRecord>(attendanceCollection);
   
@@ -78,8 +79,10 @@ export default function AttendancePage() {
     label: format(new Date(0, i), 'MMMM'),
   }));
 
-  const year = new Date().getFullYear();
-  const monthStartDate = startOfMonth(new Date(year, selectedMonth));
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
+
+  const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
   const monthEndDate = endOfMonth(monthStartDate);
   const daysInMonth = eachDayOfInterval({ start: monthStartDate, end: monthEndDate });
 
@@ -165,12 +168,22 @@ export default function AttendancePage() {
                     </SelectContent>
                 </Select>
                 <Select onValueChange={(value) => setSelectedMonth(Number(value))} value={String(selectedMonth)}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-[150px]">
                         <SelectValue placeholder="Select month" />
                     </SelectTrigger>
                     <SelectContent>
                         {monthOptions.map((month) => (
                             <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                 <Select onValueChange={(value) => setSelectedYear(Number(value))} value={String(selectedYear)}>
+                    <SelectTrigger className="w-[120px]">
+                        <SelectValue placeholder="Select year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {yearOptions.map((year) => (
+                            <SelectItem key={year} value={String(year)}>{year}</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
