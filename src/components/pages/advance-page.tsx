@@ -35,38 +35,31 @@ import {
 } from '@/components/ui/table';
 import type { Staff, AdvancePayment } from '@/lib/definitions';
 import { Calendar, DollarSign, Send, UserSearch } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { SimpleLogin } from '@/components/simple-login';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 
 
 export default function AdvancePage() {
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
   
-  const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
 
   const staffCollection = useMemoFirebase(() => {
-    if (!user) return null;
     return collection(firestore, 'staff');
-  }, [firestore, user]);
+  }, [firestore]);
   const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
 
   const advancePaymentsCollection = useMemoFirebase(() => {
-    if (!user || !selectedStaffId) return null;
+    if (!selectedStaffId) return null;
     return query(
       collection(firestore, `staff/${selectedStaffId}/advance_payments`)
     );
-  }, [firestore, user, selectedStaffId]);
+  }, [firestore, selectedStaffId]);
 
   const { data: payments, isLoading: isLoadingPayments } = useCollection<AdvancePayment>(advancePaymentsCollection);
 
 
-  if (isUserLoading || isLoadingStaff ) {
-    return <SimpleLogin title="Advance Payments" description="Please sign in to manage advance payments." />;
-  }
-  
-  if (!user || !staff) {
-     return <SimpleLogin title="Advance Payments" description="Please sign in to manage advance payments." />;
+  if (isLoadingStaff ) {
+    return <p>Loading...</p>;
   }
 
   const toDate = (date: Date | Timestamp) => (date instanceof Timestamp ? date.toDate() : date);
@@ -78,7 +71,7 @@ export default function AdvancePage() {
             <div className='space-y-1.5'>
                 <CardTitle>Payment History</CardTitle>
                 <CardDescription>
-                {selectedStaffId ? `Showing payments for ${staff.find(s => s.id === selectedStaffId)?.name}` : 'Select a staff member to see their history.'}
+                {selectedStaffId && staff ? `Showing payments for ${staff.find(s => s.id === selectedStaffId)?.name}` : 'Select a staff member to see their history.'}
               </CardDescription>
             </div>
             <div className="flex items-center gap-4">
@@ -87,7 +80,7 @@ export default function AdvancePage() {
                         <SelectValue placeholder="Select staff" />
                     </SelectTrigger>
                     <SelectContent>
-                        {staff.map((s) => (
+                        {staff && staff.map((s) => (
                             <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                         ))}
                     </SelectContent>
@@ -122,7 +115,7 @@ export default function AdvancePage() {
                 ) : payments && payments.length > 0 ? (
                   payments.map((payment) => (
                     <TableRow key={payment.id}>
-                      <TableCell>{staff.find((s) => s.id === payment.staffId)?.name}</TableCell>
+                      <TableCell>{staff && staff.find((s) => s.id === payment.staffId)?.name}</TableCell>
                       <TableCell>{format(toDate(payment.date), 'MMM d, yyyy')}</TableCell>
                       <TableCell className="text-right">
                         {payment.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}

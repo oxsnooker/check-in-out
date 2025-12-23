@@ -10,22 +10,17 @@ import {
   collection,
   serverTimestamp,
   Timestamp,
+  getDocs,
+  writeBatch
 } from 'firebase/firestore';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  updatePassword,
-  EmailAuthProvider,
-  reauthenticateWithCredential
-} from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
 import { initializeFirebase } from '@/firebase';
 
-import type { Staff, AttendanceRecord, AdvancePayment } from './definitions';
+import type { Staff } from './definitions';
+import { v4 as uuidv4 } from 'uuid';
+
 
 const FormSchema = z.object({
-  id: z.string(),
+  id: z.string().optional(),
   staffId: z.string({
     invalid_type_error: 'Please select a staff member.',
   }),
@@ -47,8 +42,8 @@ const FormSchema = z.object({
     .optional(),
   password: z
     .string()
-    .min(6, { message: 'Password must be at least 6 characters.' }),
-  email: z.string().email({ message: 'Please enter a valid email.' }),
+    .min(6, { message: 'Password must be at least 6 characters.' }).optional(),
+  email: z.string().email({ message: 'Please enter a valid email.' }).optional(),
   date: z.string().optional(),
 });
 
@@ -67,7 +62,6 @@ const UpdateStaff = FormSchema.pick({
   hourlyRate: true,
   password: true,
 });
-const SignIn = FormSchema.pick({ email: true, password: true });
 
 
 export type State = {
@@ -86,85 +80,6 @@ export type State = {
   };
   message?: string | null;
 };
-
-export async function verifyStaffPassword(prevState: State, formData: FormData) {
-    const validatedFields = SignIn.safeParse({
-        email: formData.get('email'),
-        password: formData.get('password'),
-    });
-
-    if (!validatedFields.success) {
-        return {
-            errors: validatedFields.error.flatten().fieldErrors,
-            message: 'Invalid fields. Failed to verify.',
-        }
-    }
-    
-    const { email, password } = validatedFields.data;
-    const { auth } = initializeFirebase();
-    const user = auth.currentUser;
-
-    if (!user) {
-      return {
-        errors: { password: ['You must be logged in to perform this action.'] },
-        message: 'Verification failed.',
-      };
-    }
-    
-    try {
-        // We reauthenticate against the currently logged-in user, but use the credentials
-        // of the staff member being verified.
-        const credential = EmailAuthProvider.credential(email, password);
-        // This is a temporary sign-in to verify credentials. It does not change the overall auth state.
-        const tempAuth = initializeFirebase().auth;
-        await signInWithEmailAndPassword(tempAuth, email, password);
-        // Since we don't have access to the user object of the selected staff member to reauthenticate,
-        // we simulate verification by attempting a sign-in with their credentials.
-        // A more robust solution would use a backend admin SDK to verify.
-        // For this client-side app, this is a practical workaround.
-        
-        // After verification, we must sign in back as the original user to not disrupt the session.
-        // This is a simplified example; a real app would handle this more gracefully.
-        if (auth.currentUser?.email !== user.email) {
-             await signInWithEmailAndPassword(auth, user.email!, 'password-placeholder-for-re-login'); // This part is problematic and should be re-evaluated
-        }
-
-        return { message: 'Verification successful.' };
-    } catch (e: any) {
-         return {
-            errors: { password: ['Invalid password.'] },
-            message: `Verification failed.`,
-        }
-    }
-}
-
-
-export async function signInWithEmail(prevState: State, formData: FormData) {
-    const validatedFields = SignIn.safeParse({
-        email: formData.get('email'),
-        password: formData.get('password'),
-    });
-
-    if (!validatedFields.success) {
-        return {
-            errors: validatedFields.error.flatten().fieldErrors,
-            message: 'Invalid fields. Failed to sign in.',
-        }
-    }
-
-    const { email, password } = validatedFields.data;
-    const { auth } = initializeFirebase();
-
-    try {
-        await signInWithEmailAndPassword(auth, email!, password);
-        revalidatePath('/');
-        return { message: 'Sign in successful.' };
-    } catch(e: any) {
-        return {
-             message: `Sign in failed: ${e.message}`,
-        }
-    }
-}
 
 
 function combineDateAndTime(date: string, time: string): Date {
@@ -290,20 +205,14 @@ export async function addStaff(prevState: State, formData: FormData) {
     };
   }
 
-  const { name, email, hourlyRate, password } = validatedFields.data;
+  const { name, email, hourlyRate } = validatedFields.data;
 
-  const { firestore, auth } = initializeFirebase();
+  const { firestore } = initializeFirebase();
 
   try {
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
-    const user = userCredential.user;
-
-    await setDoc(doc(firestore, 'staff', user.uid), {
-      id: user.uid,
+    const staffId = uuidv4();
+    await setDoc(doc(firestore, 'staff', staffId), {
+      id: staffId,
       name,
       hourlyRate,
       email: email,
@@ -318,12 +227,17 @@ export async function addStaff(prevState: State, formData: FormData) {
   }
 }
 
+
 export async function updateStaff(prevState: State, formData: FormData) {
-  const validatedFields = UpdateStaff.safeParse({
+  // Omitting password from validation as it's not used.
+  const validatedFields = FormSchema.pick({
+    id: true,
+    name: true,
+    hourlyRate: true,
+  }).safeParse({
     id: formData.get('id'),
     name: formData.get('name'),
     hourlyRate: formData.get('hourlyRate'),
-    password: formData.get('password'),
   });
 
   if (!validatedFields.success) {
@@ -333,9 +247,9 @@ export async function updateStaff(prevState: State, formData: FormData) {
     };
   }
 
-  const { id, name, hourlyRate, password } = validatedFields.data;
+  const { id, name, hourlyRate } = validatedFields.data;
 
-  const { firestore, auth } = initializeFirebase();
+  const { firestore } = initializeFirebase();
   const staffDocRef = doc(firestore, 'staff', id!);
 
   try {
@@ -344,11 +258,6 @@ export async function updateStaff(prevState: State, formData: FormData) {
     if (hourlyRate) updateData.hourlyRate = hourlyRate;
 
     await setDoc(staffDocRef, updateData, { merge: true });
-
-    // This part is tricky without having the user logged in.
-    // We can't update password directly this way without admin SDK or re-authentication.
-    // For now, this will not update the auth password, only the firestore record.
-    // A proper implementation would require admin privileges.
 
     revalidatePath('/admin');
     return { message: 'Staff member updated successfully.' };
@@ -362,14 +271,35 @@ export async function updateStaff(prevState: State, formData: FormData) {
 export async function deleteStaff(staffId: string) {
   const { firestore } = initializeFirebase();
   try {
-    // This action requires admin privileges to delete users from auth and their data.
-    // For a client-side only app, we can only delete the Firestore document.
-    // The user will remain in Firebase Auth.
-    await deleteDoc(doc(firestore, 'staff', staffId));
+    // Start a batch to delete staff and their related subcollections
+    const batch = writeBatch(firestore);
+
+    // 1. Delete the staff document itself
+    const staffDocRef = doc(firestore, 'staff', staffId);
+    batch.delete(staffDocRef);
+
+    // 2. Delete attendance records
+    const attendanceRecordsRef = collection(firestore, `staff/${staffId}/attendance_records`);
+    const attendanceRecordsSnapshot = await getDocs(attendanceRecordsRef);
+    attendanceRecordsSnapshot.forEach(doc => batch.delete(doc.ref));
+
+    // 3. Delete advance payments
+    const advancePaymentsRef = collection(firestore, `staff/${staffId}/advance_payments`);
+    const advancePaymentsSnapshot = await getDocs(advancePaymentsRef);
+    advancePaymentsSnapshot.forEach(doc => batch.delete(doc.ref));
+    
+    // 4. Delete salaries
+    const salariesRef = collection(firestore, `staff/${staffId}/salaries`);
+    const salariesSnapshot = await getDocs(salariesRef);
+    salariesSnapshot.forEach(doc => batch.delete(doc.ref));
+
+    // Commit the batch
+    await batch.commit();
 
     revalidatePath('/admin');
-    return { message: 'Staff member deleted from Firestore.' };
+    return { message: 'Staff member and all their data deleted successfully.' };
   } catch (error) {
+    console.error("Failed to delete staff member:", error);
     return { message: 'Database Error: Failed to Delete Staff Member.' };
   }
 }

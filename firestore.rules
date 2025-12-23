@@ -1,24 +1,19 @@
 /**
- * This ruleset allows any authenticated user to perform read and write operations.
- * It's suitable for prototyping where granular access control is not yet a priority.
+ * This ruleset allows public read and write access to all data.
+ * It is suitable for initial development and prototyping where security is not a concern.
+ *
+ * WARNING: This is an insecure configuration and should not be used in production
+ * without implementing proper security rules to protect your data.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    /**
-     * Helper function to check if the user is signed in.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
     /**
      * This rule matches any document in any collection.
-     * It allows read and write access to any authenticated user.
+     * It allows read and write access to anyone.
      */
     match /{path=**} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true;
     }
   }
 }

@@ -31,8 +31,7 @@ import {
 import { Input } from '@/components/ui/input';
 import type { Staff, AttendanceRecord } from '@/lib/definitions';
 import { UserSearch } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { SimpleLogin } from '@/components/simple-login';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 
 function combineDateAndTime(date: Date, time: string): Date {
     const [hours, minutes] = time.split(':');
@@ -48,17 +47,15 @@ export default function AttendancePage() {
   const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear());
   const { toast } = useToast();
 
-  const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
 
   const staffCollection = useMemoFirebase(() => {
-    if (!user) return null;
     return collection(firestore, 'staff');
-  }, [firestore, user]);
+  }, [firestore]);
   const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
 
   const attendanceCollection = useMemoFirebase(() => {
-    if (!user || !selectedStaffId) return null;
+    if (!selectedStaffId) return null;
     
     const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
     const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
@@ -68,7 +65,7 @@ export default function AttendancePage() {
         where('checkIn', '>=', Timestamp.fromDate(startDate)),
         where('checkIn', '<=', Timestamp.fromDate(endDate))
     );
-  }, [firestore, user, selectedStaffId, selectedMonth, selectedYear]);
+  }, [firestore, selectedStaffId, selectedMonth, selectedYear]);
 
   const { data: records, isLoading: isLoadingRecords } = useCollection<AttendanceRecord>(attendanceCollection);
   
@@ -135,12 +132,8 @@ export default function AttendancePage() {
   };
 
 
-  if (isUserLoading || isLoadingStaff) {
-    return <SimpleLogin title="Attendance" description="Please sign in to manage attendance." />;
-  }
-  
-  if (!user || !staff) {
-     return <SimpleLogin title="Attendance" description="Please sign in to manage attendance." />;
+  if (isLoadingStaff) {
+    return <p>Loading...</p>;
   }
 
   return (
@@ -150,7 +143,7 @@ export default function AttendancePage() {
           <div className='space-y-1.5'>
               <CardTitle>Attendance History</CardTitle>
               <CardDescription>
-                {selectedStaffId ? `Showing records for ${staff.find(s => s.id === selectedStaffId)?.name}` : 'Select a staff member to see their history.'}
+                {selectedStaffId && staff ? `Showing records for ${staff.find(s => s.id === selectedStaffId)?.name}` : 'Select a staff member to see their history.'}
               </CardDescription>
           </div>
             <div className="flex items-center gap-4">
@@ -159,7 +152,7 @@ export default function AttendancePage() {
                         <SelectValue placeholder="Select staff" />
                     </SelectTrigger>
                     <SelectContent>
-                        {staff.map((s) => (
+                        {staff && staff.map((s) => (
                             <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                         ))}
                     </SelectContent>
