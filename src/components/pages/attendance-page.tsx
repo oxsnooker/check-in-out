@@ -179,6 +179,8 @@ export default function AttendancePage() {
     }
   };
 
+  const selectedStaffMember = staff?.find((s) => s.id === selectedStaffId);
+
   return (
     <div className="grid grid-cols-1 gap-8">
       <Card>
@@ -186,10 +188,8 @@ export default function AttendancePage() {
           <div className="space-y-1.5">
             <CardTitle>Attendance History</CardTitle>
             <CardDescription>
-              {selectedStaffId && staff
-                ? `Showing records for ${
-                    staff.find((s) => s.id === selectedStaffId)?.name
-                  }`
+              {selectedStaffMember
+                ? `Showing records for ${selectedStaffMember.firstName} ${selectedStaffMember.lastName}`
                 : 'Select a staff member to see their history.'}
             </CardDescription>
           </div>
@@ -198,14 +198,14 @@ export default function AttendancePage() {
               onValueChange={setSelectedStaffId}
               value={selectedStaffId ?? ''}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[220px]">
                 <SelectValue placeholder="Select staff" />
               </SelectTrigger>
               <SelectContent>
                 {staff &&
                   staff.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.name}
+                      {s.firstName} {s.lastName}
                     </SelectItem>
                   ))}
               </SelectContent>
@@ -372,3 +372,5 @@ export default function AttendancePage() {
     </div>
   );
 }
+
+    

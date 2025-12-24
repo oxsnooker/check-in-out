@@ -2,7 +2,8 @@ import type { Timestamp } from 'firebase/firestore';
 
 export interface Staff {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   hourlyRate: number;
 }
 
@@ -21,3 +22,5 @@ export interface AdvancePayment {
   amount: number;
   date: Date | Timestamp;
 }
+
+    

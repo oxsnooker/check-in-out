@@ -132,7 +132,7 @@ export default function SalaryPage() {
 
     salaryData = {
       staffId: selectedStaffId,
-      staffName: selectedStaffInfo.name,
+      staffName: `${selectedStaffInfo.firstName} ${selectedStaffInfo.lastName}`,
       totalHours,
       hourlyRate: selectedStaffInfo.hourlyRate,
       salaryAmount,
@@ -153,7 +153,7 @@ export default function SalaryPage() {
               Select a staff member to view their salary information.
             </CardDescription>
           </div>
-          <div className="w-[180px]">
+          <div className="w-[220px]">
             <Select
               onValueChange={handleStaffSelection}
               value={selectedStaffId ?? ''}
@@ -165,7 +165,7 @@ export default function SalaryPage() {
                 {staff &&
                   staff.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.name}
+                      {s.firstName} {s.lastName}
                     </SelectItem>
                   ))}
               </SelectContent>
@@ -180,7 +180,7 @@ export default function SalaryPage() {
             <CardHeader>
               <CardTitle>Verify Access</CardTitle>
               <CardDescription>
-                To view salary details for {selectedStaffInfo?.name}, please
+                To view salary details for {selectedStaffInfo?.firstName} {selectedStaffInfo?.lastName}, please
                 enter the admin password.
               </CardDescription>
             </CardHeader>
@@ -295,3 +295,5 @@ export default function SalaryPage() {
     </div>
   );
 }
+
+    

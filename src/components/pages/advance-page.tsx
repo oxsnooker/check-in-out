@@ -41,7 +41,6 @@ import {
   DialogTitle,
   DialogClose,
 } from '@/components/ui/dialog';
-import { v4 as uuidv4 } from 'uuid';
 import {
   useCollection,
   useFirestore,
@@ -49,7 +48,6 @@ import {
 } from '@/firebase';
 import { collection, doc, query, where, Timestamp } from 'firebase/firestore';
 import {
-  addDocumentNonBlocking,
   deleteDocumentNonBlocking,
   updateDocumentNonBlocking,
   setDocumentNonBlocking,
@@ -62,7 +60,7 @@ function VerifyButton() {
     <Button
       type="submit"
       disabled={pending}
-      className="w-full bg-destructive hover:bg-destructive/90"
+      className="bg-destructive hover:bg-destructive/90"
     >
       {pending ? 'Verifying...' : 'Verify & Delete'}
       <ShieldCheck className="ml-2 size-4" />
@@ -86,8 +84,7 @@ export default function AdvancePage() {
   const { toast } = useToast();
 
   const [isDeleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
-  const [isVerified, setIsVerified] = React.useState(false);
-  const [paymentToDelete, setPaymentToDelete] = React.useState<{ day: Date, payment: AdvancePayment } | null>(null);
+  const [paymentToDelete, setPaymentToDelete] = React.useState<AdvancePayment | null>(null);
 
   const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
   const monthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
@@ -108,10 +105,13 @@ export default function AdvancePage() {
     const formData = new FormData(event.currentTarget);
     const password = formData.get('password') as string;
     if (password === adminPassword) {
-      setIsVerified(true);
-      toast({ title: 'Success', description: 'Verification successful.' });
+        toast({ title: 'Success', description: 'Verification successful. Deleting payment...' });
+        if(paymentToDelete) {
+            handleDelete(paymentToDelete.id);
+        }
+        setDeleteDialogOpen(false);
+        setPaymentToDelete(null);
     } else {
-      setIsVerified(false);
       toast({
         title: 'Verification Failed',
         description: 'Incorrect password.',
@@ -120,15 +120,6 @@ export default function AdvancePage() {
     }
   }
 
-  React.useEffect(() => {
-    if (isVerified && paymentToDelete) {
-      handleDelete(paymentToDelete.payment.id);
-      setIsVerified(false);
-      setPaymentToDelete(null);
-      setDeleteDialogOpen(false);
-    }
-  }, [isVerified, paymentToDelete]);
-
   const monthOptions = Array.from({ length: 12 }, (_, i) => ({
     value: i,
     label: format(new Date(0, i), 'MMMM'),
@@ -136,10 +127,6 @@ export default function AdvancePage() {
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
-
-  const formatDate = (date: Date) => {
-    return format(date, 'MMM d, yyyy');
-  };
 
   const daysInMonth = eachDayOfInterval({
     start: monthStartDate,
@@ -182,13 +169,14 @@ export default function AdvancePage() {
         const paymentDocRef = doc(paymentsCollRef, existingPayment.id);
         updateDocumentNonBlocking(paymentDocRef, { amount });
       } else {
-        const newPayment: Omit<AdvancePayment, 'id'> = {
+        const paymentId = format(day, 'yyyyMMdd');
+        const newPayment: Omit<AdvancePayment, 'id'> & { id?: string } = {
           staffId: selectedStaffId,
           date: Timestamp.fromDate(day),
           amount: amount,
         };
-        const paymentId = format(day, 'yyyyMMdd');
         const paymentDocRef = doc(paymentsCollRef, paymentId);
+        // Use set with merge to create or update, as a single operation
         setDocumentNonBlocking(paymentDocRef, newPayment, { merge: true });
       }
 
@@ -213,11 +201,12 @@ export default function AdvancePage() {
     toast({ title: 'Success', description: 'Advance payment deleted.' });
   };
   
-  const openDeleteDialog = (day: Date, payment: AdvancePayment) => {
-    setPaymentToDelete({day, payment});
-    setIsVerified(false);
+  const openDeleteDialog = (payment: AdvancePayment) => {
+    setPaymentToDelete(payment);
     setDeleteDialogOpen(true);
   }
+
+  const selectedStaffMember = staff?.find((s) => s.id === selectedStaffId);
 
   return (
     <>
@@ -227,10 +216,8 @@ export default function AdvancePage() {
             <div className="space-y-1.5">
               <CardTitle>Payment History</CardTitle>
               <CardDescription>
-                {selectedStaffId && staff
-                  ? `Showing payments for ${
-                      staff.find((s) => s.id === selectedStaffId)?.name
-                    }`
+                {selectedStaffMember
+                  ? `Showing payments for ${selectedStaffMember.firstName} ${selectedStaffMember.lastName}`
                   : 'Select a staff member to see their history.'}
               </CardDescription>
             </div>
@@ -246,7 +233,7 @@ export default function AdvancePage() {
                   {staff &&
                     staff.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.name}
+                        {s.firstName} {s.lastName}
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -288,7 +275,7 @@ export default function AdvancePage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right w-[200px]">Amount</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -316,7 +303,7 @@ export default function AdvancePage() {
 
                     return (
                       <TableRow key={day.toISOString()}>
-                        <TableCell>{formatDate(day)}</TableCell>
+                        <TableCell>{format(day, 'MMM d, yyyy')}</TableCell>
                         <TableCell className="flex items-center justify-end gap-2 text-right">
                           <Input
                             type="number"
@@ -334,7 +321,7 @@ export default function AdvancePage() {
                                 variant="ghost"
                                 size="icon"
                                 className="text-destructive hover:text-destructive"
-                                onClick={() => openDeleteDialog(day, payment)}
+                                onClick={() => openDeleteDialog(payment)}
                               >
                                 <Trash2 className="size-4" />
                               </Button>
@@ -356,14 +343,14 @@ export default function AdvancePage() {
         </Card>
       </div>
 
-       {paymentToDelete && (
+       {paymentToDelete && selectedStaffMember &&(
         <Dialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
             <DialogContent>
                  <form onSubmit={handleVerify}>
                     <DialogHeader>
                         <DialogTitle>Verify Deletion</DialogTitle>
                          <DialogDescription>
-                            To delete the advance payment of {paymentToDelete.payment.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} for {formatDate(toDate(paymentToDelete.day))}, please enter the admin password.
+                            To delete the advance payment of {paymentToDelete.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} for {selectedStaffMember.firstName} {selectedStaffMember.lastName} on {paymentToDelete.date && toDate(paymentToDelete.date) ? format(toDate(paymentToDelete.date)!, 'MMM d, yyyy') : ''}, please enter the admin password.
                         </DialogDescription>
                     </DialogHeader>
                      <div className="space-y-4 py-4">
@@ -392,3 +379,5 @@ export default function AdvancePage() {
     </>
   );
 }
+
+    

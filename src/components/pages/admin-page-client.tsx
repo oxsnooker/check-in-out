@@ -72,7 +72,7 @@ function VerifyButton() {
     <Button
       type="submit"
       disabled={pending}
-      className="w-full bg-destructive hover:bg-destructive/90"
+      className="bg-destructive hover:bg-destructive/90"
     >
       {pending ? 'Verifying...' : 'Verify & Delete'}
       <ShieldCheck className="ml-2 size-4" />
@@ -109,7 +109,6 @@ export default function AdminPageClient() {
   const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
   const [isEditDialogOpen, setEditDialogOpen] = React.useState(false);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
-  const [isVerifiedForDelete, setIsVerifiedForDelete] = React.useState(false);
   const [staffToDelete, setStaffToDelete] = React.useState<Staff | null>(null);
 
   const [currentPassword, setCurrentPassword] = React.useState('');
@@ -119,16 +118,16 @@ export default function AdminPageClient() {
   async function handleAddStaff(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const newStaff = {
-      id: uuidv4(),
-      name: formData.get('name') as string,
+    const newStaff: Omit<Staff, 'id'> = {
+      firstName: formData.get('firstName') as string,
+      lastName: formData.get('lastName') as string,
       hourlyRate: parseFloat(formData.get('hourlyRate') as string),
     };
 
-    if (!newStaff.name || newStaff.hourlyRate <= 0) {
+    if (!newStaff.firstName || !newStaff.lastName || newStaff.hourlyRate <= 0) {
       toast({
         title: 'Error',
-        description: 'Please provide a valid name and hourly rate.',
+        description: 'Please provide valid first name, last name and hourly rate.',
         variant: 'destructive',
       });
       return;
@@ -143,13 +142,13 @@ export default function AdminPageClient() {
     event.preventDefault();
     if (!selectedStaff) return;
     const formData = new FormData(event.currentTarget);
-    const updatedStaff = {
-      id: selectedStaff.id,
-      name: formData.get('name') as string,
+    const updatedStaff: Partial<Staff> = {
+      firstName: formData.get('firstName') as string,
+      lastName: formData.get('lastName') as string,
       hourlyRate: parseFloat(formData.get('hourlyRate') as string),
     };
 
-    if (!updatedStaff.name || updatedStaff.hourlyRate <= 0) {
+    if (!updatedStaff.firstName || !updatedStaff.lastName || !updatedStaff.hourlyRate || updatedStaff.hourlyRate <= 0) {
       toast({
         title: 'Error',
         description: 'Please provide a valid name and hourly rate.',
@@ -158,7 +157,7 @@ export default function AdminPageClient() {
       return;
     }
 
-    const staffDocRef = doc(firestore, 'staff', updatedStaff.id);
+    const staffDocRef = doc(firestore, 'staff', selectedStaff.id);
     updateDocumentNonBlocking(staffDocRef, updatedStaff);
     toast({ title: 'Success', description: 'Staff member updated.' });
     setEditDialogOpen(false);
@@ -169,15 +168,18 @@ export default function AdminPageClient() {
     const formData = new FormData(event.currentTarget);
     const password = formData.get('password') as string;
     if (password === adminPassword) {
-      toast({ title: 'Success', description: 'Verification successful.' });
-      setIsVerifiedForDelete(true);
+      toast({ title: 'Success', description: 'Verification successful. Deleting staff...' });
+      if (staffToDelete) {
+        handleDelete(staffToDelete.id);
+      }
+      setDeleteDialogOpen(false); 
+      setStaffToDelete(null);
     } else {
       toast({
         title: 'Verification Failed',
         description: 'Incorrect password.',
         variant: 'destructive',
       });
-      setIsVerifiedForDelete(false);
     }
   }
 
@@ -217,20 +219,11 @@ export default function AdminPageClient() {
   const handleDelete = async (staffId: string) => {
     const staffDocRef = doc(firestore, 'staff', staffId);
     deleteDocumentNonBlocking(staffDocRef);
-    setDeleteDialogOpen(false);
     toast({
       title: 'Success',
       description: 'Staff member deleted.',
     });
   };
-
-  React.useEffect(() => {
-    if (isVerifiedForDelete && staffToDelete) {
-      handleDelete(staffToDelete.id);
-      setIsVerifiedForDelete(false);
-      setStaffToDelete(null);
-    }
-  }, [isVerifiedForDelete, staffToDelete]);
 
   const handleEditClick = (staffMember: Staff) => {
     setSelectedStaff(staffMember);
@@ -239,7 +232,6 @@ export default function AdminPageClient() {
 
   const openDeleteDialog = (staffMember: Staff) => {
     setStaffToDelete(staffMember);
-    setIsVerifiedForDelete(false);
     setDeleteDialogOpen(true);
   };
 
@@ -257,8 +249,12 @@ export default function AdminPageClient() {
             <CardContent>
               <form ref={addFormRef} onSubmit={handleAddStaff} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input id="name" name="name" placeholder="John Doe" />
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input id="firstName" name="firstName" placeholder="John" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input id="lastName" name="lastName" placeholder="Doe" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="hourlyRate">Hourly Rate ($)</Label>
@@ -351,7 +347,7 @@ export default function AdminPageClient() {
                   ) : staff && staff.length > 0 ? (
                     staff.map((s) => (
                       <TableRow key={s.id}>
-                        <TableCell>{s.name}</TableCell>
+                        <TableCell>{s.firstName} {s.lastName}</TableCell>
                         <TableCell>
                           {s.hourlyRate.toLocaleString('en-US', {
                             style: 'currency',
@@ -394,7 +390,7 @@ export default function AdminPageClient() {
           <Dialog open={isEditDialogOpen} onOpenChange={setEditDialogOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Edit Staff: {selectedStaff.name}</DialogTitle>
+                <DialogTitle>Edit Staff: {selectedStaff.firstName} {selectedStaff.lastName}</DialogTitle>
                 <DialogDescription>
                   Update the details for this staff member.
                 </DialogDescription>
@@ -402,11 +398,19 @@ export default function AdminPageClient() {
               <form onSubmit={handleUpdateStaff}>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="edit-name">Full Name</Label>
+                    <Label htmlFor="edit-firstName">First Name</Label>
                     <Input
-                      id="edit-name"
-                      name="name"
-                      defaultValue={selectedStaff.name}
+                      id="edit-firstName"
+                      name="firstName"
+                      defaultValue={selectedStaff.firstName}
+                    />
+                  </div>
+                   <div className="space-y-2">
+                    <Label htmlFor="edit-lastName">Last Name</Label>
+                    <Input
+                      id="edit-lastName"
+                      name="lastName"
+                      defaultValue={selectedStaff.lastName}
                     />
                   </div>
                   <div className="space-y-2">
@@ -440,7 +444,7 @@ export default function AdminPageClient() {
                 <DialogHeader>
                   <DialogTitle>Verify Deletion</DialogTitle>
                   <DialogDescription>
-                    To permanently delete {staffToDelete.name}, please enter
+                    To permanently delete {staffToDelete.firstName} {staffToDelete.lastName}, please enter
                     the admin password. This action cannot be undone.
                   </DialogDescription>
                 </DialogHeader>
@@ -466,3 +470,5 @@ export default function AdminPageClient() {
     </>
   );
 }
+
+    
