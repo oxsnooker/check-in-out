@@ -81,7 +81,7 @@ function ChangePasswordButton() {
     );
 }
 
-export default function AdminPage() {
+export default function AdminPageClient() {
   const { toast } = useToast();
   const addFormRef = React.useRef<HTMLFormElement>(null);
   

@@ -1,5 +1,11 @@
-import AdminPage from '@/components/pages/admin-page';
+'use client';
 import { PageHeader } from '@/components/page-header';
+import dynamic from 'next/dynamic';
+
+const AdminPageClient = dynamic(
+  () => import('@/components/pages/admin-page-client'),
+  { ssr: false }
+);
 
 export default function Admin() {
   return (
@@ -8,7 +14,7 @@ export default function Admin() {
         title="Admin Panel"
         description="Add, remove, and manage your staff members."
       />
-      <AdminPage />
+      <AdminPageClient />
     </div>
   );
 }
