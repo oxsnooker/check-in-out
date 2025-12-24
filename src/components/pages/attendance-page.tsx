@@ -129,6 +129,43 @@ export default function AttendancePage() {
     return map;
   }, [records]);
 
+  const updateRecord = async (day: Date, dataToUpdate: Partial<AttendanceRecord>) => {
+    if (!selectedStaffId) return;
+    try {
+        const dayKey = format(day, 'yyyy-MM-dd');
+        const existingRecord = attendanceMap.get(dayKey);
+        const attendanceCollRef = collection(
+            firestore,
+            `staff/${selectedStaffId}/attendanceRecords`
+        );
+        const recordId = format(day, 'yyyyMMdd');
+        const recordDocRef = doc(attendanceCollRef, recordId);
+
+        if (existingRecord) {
+            updateDocumentNonBlocking(recordDocRef, dataToUpdate);
+        } else {
+            const newRecord: Partial<AttendanceRecord> & { staffId: string; date: Timestamp } = {
+                staffId: selectedStaffId,
+                date: Timestamp.fromDate(day),
+                ...dataToUpdate
+            };
+            setDocumentNonBlocking(recordDocRef, newRecord, { merge: true });
+        }
+        toast({
+            title: 'Success',
+            description: 'Attendance record updated successfully.',
+        });
+    } catch (error) {
+        console.error('Failed to update attendance:', error);
+        toast({
+            title: 'Error',
+            description: 'Failed to update attendance record.',
+            variant: 'destructive',
+        });
+    }
+  };
+
+
   const handleTimeChange = async (
     day: Date,
     field: 'timeIn' | 'timeOut' | 'timeIn2' | 'timeOut2',
@@ -143,51 +180,27 @@ export default function AttendancePage() {
       return;
     }
 
-    try {
-      const dayKey = format(day, 'yyyy-MM-dd');
-      const existingRecord = attendanceMap.get(dayKey);
-      const attendanceCollRef = collection(
-        firestore,
-        `staff/${selectedStaffId}/attendanceRecords`
-      );
-
-      let newTimestamp: Timestamp | null = null;
-      if (time) {
-        const [hours, minutes] = time.split(':');
-        const newDateTime = new Date(day);
-        newDateTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
-        newTimestamp = Timestamp.fromDate(newDateTime);
-      }
-      
-      const updatedField = { [field]: newTimestamp };
-
-      if (existingRecord) {
-        const recordDocRef = doc(attendanceCollRef, existingRecord.id);
-        updateDocumentNonBlocking(recordDocRef, updatedField);
-      } else {
-        const newRecord: Partial<AttendanceRecord> & { staffId: string; date: Timestamp } = {
-          staffId: selectedStaffId,
-          date: Timestamp.fromDate(day),
-          ...updatedField
-        };
-        const recordId = format(day, 'yyyyMMdd');
-        const recordDocRef = doc(attendanceCollRef, recordId);
-        setDocumentNonBlocking(recordDocRef, newRecord, { merge: true });
-      }
-
-      toast({
-        title: 'Success',
-        description: 'Attendance record updated successfully.',
-      });
-      setEditingRowKey(null); // Disable editing after a change
-    } catch (error) {
-      console.error('Failed to update attendance:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update attendance record.',
-        variant: 'destructive',
-      });
+    let newTimestamp: Timestamp | null = null;
+    if (time) {
+      const [hours, minutes] = time.split(':');
+      const newDateTime = new Date(day);
+      newDateTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+      newTimestamp = Timestamp.fromDate(newDateTime);
     }
+    
+    await updateRecord(day, { [field]: newTimestamp, isAbsent: false });
+    setEditingRowKey(null); // Disable editing after a change
+  };
+  
+  const handleAbsentToggle = async (day: Date, isCurrentlyAbsent: boolean) => {
+    const updatedData = {
+        isAbsent: !isCurrentlyAbsent,
+        timeIn: null,
+        timeOut: null,
+        timeIn2: null,
+        timeOut2: null
+    };
+    await updateRecord(day, updatedData);
   };
 
   const handleEditClick = (rowKey: string) => {
@@ -315,6 +328,7 @@ export default function AttendancePage() {
                 daysInMonth.map((day) => {
                   const dayKey = format(day, 'yyyy-MM-dd');
                   const record = attendanceMap.get(dayKey);
+                  const isAbsent = record?.isAbsent ?? false;
                   const timeIn = toDate(record?.timeIn);
                   const timeOut = toDate(record?.timeOut);
                   const timeIn2 = toDate(record?.timeIn2);
@@ -332,7 +346,7 @@ export default function AttendancePage() {
                   const isEditing = editingRowKey === day.toISOString();
 
                   return (
-                    <TableRow key={day.toISOString()}>
+                    <TableRow key={day.toISOString()} className={isAbsent ? 'bg-muted/50' : ''}>
                       <TableCell>{format(day, 'MMM d, yyyy')}</TableCell>
                       <TableCell>
                         <Input
@@ -345,7 +359,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeIn', e.target.value)
                           }
-                           disabled={!!timeIn && !isEditing}
+                           disabled={isAbsent || (!!timeIn && !isEditing)}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -360,7 +374,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeOut', e.target.value)
                           }
-                          disabled={!!timeOut && !isEditing}
+                          disabled={isAbsent || (!!timeOut && !isEditing)}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -375,7 +389,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeIn2', e.target.value)
                           }
-                          disabled={!!timeIn2 && !isEditing}
+                          disabled={isAbsent || !!timeIn2 && !isEditing}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -390,21 +404,24 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeOut2', e.target.value)
                           }
-                          disabled={!!timeOut2 && !isEditing}
+                          disabled={isAbsent || !!timeOut2 && !isEditing}
                           className="w-[120px]"
                         />
                       </TableCell>
                       <TableCell>
                         <span className="font-medium">
-                          {totalHours.toFixed(2)} hrs
+                          {isAbsent ? <span className='text-red-500 font-semibold'>Absent</span> : `${totalHours.toFixed(2)} hrs`}
                         </span>
                       </TableCell>
                        <TableCell className="text-right">
+                        <Button variant={isAbsent ? 'secondary': 'outline'} size="sm" onClick={() => handleAbsentToggle(day, isAbsent)} className='mr-2'>
+                          {isAbsent ? 'Present' : 'Absent'}
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleEditClick(day.toISOString())}
-                          disabled={isEditing}
+                          disabled={isEditing || isAbsent}
                         >
                           <Edit className="size-4" />
                         </Button>

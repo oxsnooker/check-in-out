@@ -138,6 +138,7 @@ function SalaryOverview() {
                 const allAdvances = advancesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AdvancePayment));
 
                 const totalHours = allAttendance.reduce((acc, record) => {
+                    if (record.isAbsent) return acc;
                     const hours1 = calculateWorkingHours(toDate(record.timeIn), toDate(record.timeOut));
                     const hours2 = calculateWorkingHours(toDate(record.timeIn2), toDate(record.timeOut2));
                     return acc + hours1 + hours2;

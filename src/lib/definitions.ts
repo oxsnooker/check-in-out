@@ -16,6 +16,7 @@ export interface AttendanceRecord {
   timeOut?: Date | Timestamp;
   timeIn2?: Date | Timestamp;
   timeOut2?: Date | Timestamp;
+  isAbsent?: boolean;
 }
 
 export interface AdvancePayment {

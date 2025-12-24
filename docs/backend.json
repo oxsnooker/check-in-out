@@ -68,6 +68,10 @@
           "type": "string",
           "description": "The time the staff member checked out for the second shift.",
           "format": "date-time"
+        },
+        "isAbsent": {
+          "type": "boolean",
+          "description": "Indicates if the staff member was absent on this day."
         }
       },
       "required": [
