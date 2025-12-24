@@ -3,12 +3,17 @@
 import * as React from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import {
-  useFirestore,
-  useCollection,
-  useMemoFirebase,
-} from '@/firebase';
-import { collection, query, where, Timestamp, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+  collection,
+  query,
+  where,
+  Timestamp,
+  doc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+} from 'firebase/firestore';
 
 import {
   Card,
@@ -33,8 +38,20 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { Staff, AdvancePayment } from '@/lib/definitions';
-import { UserSearch } from 'lucide-react';
+import { UserSearch, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 export default function AdvancePage() {
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(
@@ -46,7 +63,7 @@ export default function AdvancePage() {
   const [selectedYear, setSelectedYear] = React.useState<number>(
     new Date().getFullYear()
   );
-    const { toast } = useToast();
+  const { toast } = useToast();
 
   const firestore = useFirestore();
 
@@ -54,7 +71,8 @@ export default function AdvancePage() {
     () => (firestore ? collection(firestore, 'staff') : null),
     [firestore]
   );
-  const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
+  const { data: staff, isLoading: isLoadingStaff } =
+    useCollection<Staff>(staffCollection);
 
   const paymentsQuery = useMemoFirebase(() => {
     if (!firestore || !selectedStaffId) return null;
@@ -67,10 +85,8 @@ export default function AdvancePage() {
     );
   }, [firestore, selectedStaffId, selectedMonth, selectedYear]);
 
-  const {
-    data: payments,
-    isLoading: isLoadingPayments,
-  } = useCollection<AdvancePayment>(paymentsQuery);
+  const { data: payments, isLoading: isLoadingPayments } =
+    useCollection<AdvancePayment>(paymentsQuery);
 
   const monthOptions = Array.from({ length: 12 }, (_, i) => ({
     value: i,
@@ -79,7 +95,7 @@ export default function AdvancePage() {
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
-  
+
   const formatDate = (date: any) => {
     if (date instanceof Timestamp) {
       return format(date.toDate(), 'MMM d, yyyy');
@@ -88,7 +104,7 @@ export default function AdvancePage() {
       return format(date, 'MMM d, yyyy');
     }
     return 'Invalid Date';
-  }
+  };
 
   const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
   const monthEndDate = endOfMonth(monthStartDate);
@@ -101,7 +117,8 @@ export default function AdvancePage() {
     if (!payments) return new Map();
     const map = new Map<string, AdvancePayment>();
     payments.forEach((payment) => {
-      const paymentDate = payment.date instanceof Timestamp ? payment.date.toDate() : payment.date;
+      const paymentDate =
+        payment.date instanceof Timestamp ? payment.date.toDate() : payment.date;
       const dayKey = format(paymentDate, 'yyyy-MM-dd');
       map.set(dayKey, payment);
     });
@@ -112,43 +129,67 @@ export default function AdvancePage() {
     if (!selectedStaffId) return;
 
     try {
-        const amount = parseFloat(amountStr);
-        const dayKey = format(day, 'yyyy-MM-dd');
-        const existingPayment = paymentsMap.get(dayKey);
+      const amount = parseFloat(amountStr);
+      const dayKey = format(day, 'yyyy-MM-dd');
+      const existingPayment = paymentsMap.get(dayKey);
+      const dayId = format(day, 'yyyyMMdd');
+      const paymentRef = doc(
+        firestore,
+        `staff/${selectedStaffId}/advance_payments`,
+        dayId
+      );
+
+      if (isNaN(amount) || amount <= 0) {
+        // If amount is invalid or zero, delete the record if it exists
+        if (existingPayment) {
+          await deleteDoc(paymentRef);
+          toast({ title: 'Success', description: 'Advance payment removed.' });
+        }
+        return;
+      }
+
+      const paymentData = {
+        id: dayId,
+        staffId: selectedStaffId,
+        date: Timestamp.fromDate(day),
+        amount: amount,
+      };
+
+      if (existingPayment) {
+        // Update existing payment
+        await updateDoc(paymentRef, { amount: amount });
+      } else {
+        // Create new payment
+        await setDoc(paymentRef, paymentData);
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Advance payment saved successfully.',
+      });
+    } catch (error) {
+      console.error('Failed to save advance payment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save advance payment.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDelete = async (day: Date) => {
+    if (!selectedStaffId) return;
+
+    try {
         const dayId = format(day, 'yyyyMMdd');
         const paymentRef = doc(firestore, `staff/${selectedStaffId}/advance_payments`, dayId);
-
-        if (isNaN(amount) || amount <= 0) {
-            // If amount is invalid or zero, delete the record if it exists
-            if (existingPayment) {
-                await deleteDoc(paymentRef);
-                toast({ title: 'Success', description: 'Advance payment removed.' });
-            }
-            return;
-        }
-
-        const paymentData = {
-            id: dayId,
-            staffId: selectedStaffId,
-            date: Timestamp.fromDate(day),
-            amount: amount,
-        };
-
-        if (existingPayment) {
-            // Update existing payment
-            await updateDoc(paymentRef, { amount: amount });
-        } else {
-            // Create new payment
-            await setDoc(paymentRef, paymentData);
-        }
-
-        toast({ title: 'Success', description: 'Advance payment saved successfully.' });
-
+        await deleteDoc(paymentRef);
+        toast({ title: 'Success', description: 'Advance payment deleted.' });
     } catch (error) {
-        console.error('Failed to save advance payment:', error);
+        console.error('Failed to delete advance payment:', error);
         toast({
             title: 'Error',
-            description: 'Failed to save advance payment.',
+            description: 'Failed to delete advance payment.',
             variant: 'destructive',
         });
     }
@@ -186,7 +227,7 @@ export default function AdvancePage() {
                   ))}
               </SelectContent>
             </Select>
-             <Select
+            <Select
               onValueChange={(value) => setSelectedMonth(Number(value))}
               value={String(selectedMonth)}
             >
@@ -228,10 +269,10 @@ export default function AdvancePage() {
             </TableHeader>
             <TableBody>
               {isLoadingPayments ? (
-                 <TableRow>
-                    <TableCell colSpan={2} className="h-24 text-center">
-                        Loading payments...
-                    </TableCell>
+                <TableRow>
+                  <TableCell colSpan={2} className="h-24 text-center">
+                    Loading payments...
+                  </TableCell>
                 </TableRow>
               ) : !selectedStaffId ? (
                 <TableRow>
@@ -248,20 +289,52 @@ export default function AdvancePage() {
                 daysInMonth.map((day) => {
                   const dayKey = format(day, 'yyyy-MM-dd');
                   const payment = paymentsMap.get(dayKey);
-                  
+
                   return (
                     <TableRow key={day.toISOString()}>
                       <TableCell>{formatDate(day)}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="flex items-center justify-end gap-2 text-right">
                         <Input
                           type="number"
                           step="0.01"
                           placeholder="0.00"
                           defaultValue={payment?.amount?.toFixed(2) ?? ''}
-                          onBlur={(e) => handleAmountChange(day, e.target.value)}
-                          className="w-[120px] ml-auto text-right"
+                          onBlur={(e) =>
+                            handleAmountChange(day, e.target.value)
+                          }
+                          className="w-[120px] text-right"
                           disabled={!selectedStaffId}
                         />
+                        {payment && (
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                    >
+                                    <Trash2 className="size-4" />
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This action cannot be undone. This will permanently delete the advance payment of {payment.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} for {formatDate(day)}.
+                                    </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                        onClick={() => handleDelete(day)}
+                                        className="bg-destructive hover:bg-destructive/90"
+                                    >
+                                        Delete
+                                    </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
