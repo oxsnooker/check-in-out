@@ -31,14 +31,14 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import type { Staff, AttendanceRecord, AdvancePayment } from '@/lib/definitions';
-import { Edit, Trash2, UserPlus, KeyRound, DollarSign, Hourglass, Clock } from 'lucide-react';
+import { Edit, Trash2, UserPlus, KeyRound } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import {
   addDocumentNonBlocking,
   deleteDocumentNonBlocking,
   updateDocumentNonBlocking,
 } from '@/firebase/non-blocking-updates';
-import { collection, doc, getDocs, query } from 'firebase/firestore';
+import { collection, doc, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,6 +51,14 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { calculateWorkingHours, toDate } from '@/lib/utils';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
 
 const ADMIN_PASSWORD = 'faz&aks76@';
 
@@ -90,12 +98,22 @@ function SalaryOverview() {
     const firestore = useFirestore();
     const [salaryData, setSalaryData] = React.useState<SalaryData[]>([]);
     const [isLoadingSalaries, setIsLoadingSalaries] = React.useState(true);
+    const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());
+    const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear());
 
     const staffCollRef = useMemoFirebase(
         () => collection(firestore, 'staff'),
         [firestore]
     );
     const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollRef);
+
+    const monthOptions = Array.from({ length: 12 }, (_, i) => ({
+      value: i,
+      label: format(new Date(0, i), 'MMMM'),
+    }));
+  
+    const currentYear = new Date().getFullYear();
+    const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
     React.useEffect(() => {
         if (!staff) return;
@@ -104,9 +122,12 @@ function SalaryOverview() {
             setIsLoadingSalaries(true);
             const allSalaryData: SalaryData[] = [];
 
+            const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
+            const monthEndDate = endOfMonth(monthStartDate);
+
             for (const staffMember of staff) {
-                const attendanceQuery = query(collection(firestore, `staff/${staffMember.id}/attendanceRecords`));
-                const advancesQuery = query(collection(firestore, `staff/${staffMember.id}/advancePayments`));
+                const attendanceQuery = query(collection(firestore, `staff/${staffMember.id}/attendanceRecords`), where('date', '>=', monthStartDate), where('date', '<=', monthEndDate));
+                const advancesQuery = query(collection(firestore, `staff/${staffMember.id}/advancePayments`), where('date', '>=', monthStartDate), where('date', '<=', monthEndDate));
 
                 const [attendanceSnapshot, advancesSnapshot] = await Promise.all([
                     getDocs(attendanceQuery),
@@ -145,15 +166,49 @@ function SalaryOverview() {
         };
 
         fetchAllData();
-    }, [staff, firestore]);
+    }, [staff, firestore, selectedMonth, selectedYear]);
 
     return (
         <Card>
-            <CardHeader>
+            <CardHeader className="flex-row items-center justify-between">
+              <div>
                 <CardTitle>Salary Overview</CardTitle>
                 <CardDescription>
                     A summary of salary details for all staff members.
                 </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                 <Select
+                    onValueChange={(value) => setSelectedMonth(Number(value))}
+                    value={String(selectedMonth)}
+                  >
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder="Select month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {monthOptions.map((month) => (
+                        <SelectItem key={month.value} value={String(month.value)}>
+                          {month.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    onValueChange={(value) => setSelectedYear(Number(value))}
+                    value={String(selectedYear)}
+                  >
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue placeholder="Select year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map((year) => (
+                        <SelectItem key={year} value={String(year)}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+              </div>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -167,7 +222,7 @@ function SalaryOverview() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {isLoadingSalaries ? (
+                        {isLoadingSalaries || isLoadingStaff ? (
                             <TableRow>
                                 <TableCell colSpan={5} className="h-24 text-center">
                                     Loading salaries...
