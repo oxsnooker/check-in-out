@@ -51,6 +51,17 @@ import {
   updateDocumentNonBlocking,
 } from '@/firebase/non-blocking-updates';
 import { Button } from '../ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '../ui/label';
+
+const EDIT_PASSWORD = 'Afzalafu76@';
 
 export default function AttendancePage() {
   const firestore = useFirestore();
@@ -72,6 +83,9 @@ export default function AttendancePage() {
     new Date().getFullYear()
   );
   const [editingRowKey, setEditingRowKey] = React.useState<string | null>(null);
+  const [isVerificationOpen, setVerificationOpen] = React.useState(false);
+  const [rowToEdit, setRowToEdit] = React.useState<string | null>(null);
+  const [passwordInput, setPasswordInput] = React.useState('');
 
 
   const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
@@ -176,9 +190,36 @@ export default function AttendancePage() {
     }
   };
 
+  const handleEditClick = (rowKey: string) => {
+    setRowToEdit(rowKey);
+    setVerificationOpen(true);
+  };
+
+  const handleVerification = () => {
+    if (passwordInput === EDIT_PASSWORD) {
+      if (rowToEdit) {
+        setEditingRowKey(rowToEdit);
+      }
+      toast({
+        title: 'Success',
+        description: 'Verification successful. You can now edit the record.',
+      });
+      setVerificationOpen(false);
+      setPasswordInput('');
+      setRowToEdit(null);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Incorrect password. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const selectedStaffMember = staff?.find((s) => s.id === selectedStaffId);
 
   return (
+    <>
     <div className="grid grid-cols-1 gap-8">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -304,7 +345,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeIn', e.target.value)
                           }
-                          disabled={!isEditing && !!timeIn}
+                          disabled={!isEditing}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -319,7 +360,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeOut', e.target.value)
                           }
-                          disabled={!isEditing && !!timeOut}
+                          disabled={!isEditing}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -334,7 +375,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeIn2', e.target.value)
                           }
-                          disabled={!isEditing && !!timeIn2}
+                          disabled={!isEditing}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -349,7 +390,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeOut2', e.target.value)
                           }
-                          disabled={!isEditing && !!timeOut2}
+                          disabled={!isEditing}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -362,7 +403,7 @@ export default function AttendancePage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setEditingRowKey(day.toISOString())}
+                          onClick={() => handleEditClick(day.toISOString())}
                           disabled={isEditing}
                         >
                           <Edit className="size-4" />
@@ -384,5 +425,35 @@ export default function AttendancePage() {
         </CardContent>
       </Card>
     </div>
+     <Dialog open={isVerificationOpen} onOpenChange={setVerificationOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enter Password to Edit</DialogTitle>
+            <DialogDescription>
+              Please enter the admin password to make changes to this record.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-4">
+            <Label htmlFor="edit-password">Password</Label>
+            <Input
+              id="edit-password"
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleVerification()}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setVerificationOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleVerification}>Verify & Edit</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
