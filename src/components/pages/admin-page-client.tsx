@@ -181,6 +181,14 @@ export default function AdminPageClient() {
                     placeholder="20.00"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                  />
+                </div>
                 <AddStaffSubmitButton />
               </form>
             </CardContent>
