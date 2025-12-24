@@ -4,6 +4,7 @@ import * as React from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { calculateWorkingHours } from '@/lib/utils';
+import useLocalStorage from '@/hooks/use-local-storage';
 
 import {
   Card,
@@ -34,8 +35,8 @@ import { UserSearch } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 export default function AttendancePage() {
-  const [staff] = React.useState<Staff[]>(MOCK_STAFF);
-  const [records, setRecords] = React.useState<AttendanceRecord[]>(MOCK_ATTENDANCE);
+  const [staff] = useLocalStorage<Staff[]>('staff', MOCK_STAFF);
+  const [records, setRecords] = useLocalStorage<AttendanceRecord[]>('attendance', MOCK_ATTENDANCE);
   
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());
@@ -72,11 +73,27 @@ export default function AttendancePage() {
     field: 'checkIn' | 'checkOut' | 'checkIn2' | 'checkOut2',
     time: string
   ) => {
-    if (!selectedStaffId || !time) return;
 
     try {
       const dayKey = format(day, 'yyyy-MM-dd');
       const existingRecord = attendanceMap.get(dayKey);
+
+      if (!selectedStaffId) {
+        toast({
+          title: 'Error',
+          description: 'Please select a staff member first.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (!time) { // If time is cleared, remove the timestamp
+        if (existingRecord) {
+          setRecords(prev => prev.map(r => r.id === existingRecord.id ? { ...r, [field]: undefined } : r));
+          toast({ title: 'Success', description: 'Attendance time cleared.' });
+        }
+        return;
+      }
 
       const [hours, minutes] = time.split(':');
       const newDateTime = new Date(day);
@@ -88,9 +105,14 @@ export default function AttendancePage() {
         const newRecord: AttendanceRecord = {
             id: uuidv4(),
             staffId: selectedStaffId,
-            checkIn: field === 'checkIn' ? newDateTime : day,
-            ...(field !== 'checkIn' && {[field]: newDateTime})
+            checkIn: day, // This needs to be set, but will be overwritten if field is checkIn
+            ...{[field]: newDateTime}
         };
+        // ensure checkIn is set properly
+        if(field !== 'checkIn') {
+            newRecord.checkIn = day;
+        }
+
         setRecords(prev => [...prev, newRecord]);
       }
 
@@ -213,7 +235,7 @@ export default function AttendancePage() {
                       <TableCell>
                         <Input
                           type="time"
-                          defaultValue={checkInDate ? format(checkInDate, 'HH:mm') : ''}
+                          defaultValue={checkInDate && checkInDate.getFullYear() === day.getFullYear() && checkInDate.getMonth() === day.getMonth() && checkInDate.getDate() === day.getDate() ? format(checkInDate, 'HH:mm') : ''}
                           onBlur={(e) =>
                             handleTimeChange(day, 'checkIn', e.target.value)
                           }

@@ -18,17 +18,15 @@ const FormSchema = z.object({
     .optional(),
   name: z
     .string()
-    .min(2, { message: 'Name must be at least 2 characters.' })
-    .optional(),
+    .min(2, { message: 'Name must be at least 2 characters.' }),
+  email: z.string().email({ message: 'Please enter a valid email.' }),
   hourlyRate: z.coerce
     .number()
-    .positive({ message: 'Please enter a positive hourly rate.' })
-    .optional(),
+    .positive({ message: 'Please enter a positive hourly rate.' }),
   password: z
     .string()
     .min(6, { message: 'Password must be at least 6 characters.' })
     .optional(),
-  email: z.string().email({ message: 'Please enter a valid email.' }).optional(),
   date: z.string().optional(),
 });
 
@@ -41,10 +39,10 @@ export type State = {
     checkOut?: string[];
     amount?: string[];
     name?: string[];
+    email?: string[];
     hourlyRate?: string[];
     password?: string[];
     date?: string[];
-    email?: string[];
   };
   message?: string | null;
 };
@@ -70,11 +68,12 @@ export async function addStaff(prevState: State, formData: FormData) {
 }
 
 export async function updateStaff(prevState: State, formData: FormData) {
-  const UpdateStaffSchema = FormSchema.pick({ id: true, name: true, hourlyRate: true });
+  const UpdateStaffSchema = FormSchema.pick({ id: true, name: true, hourlyRate: true, email: true });
    const validatedFields = UpdateStaffSchema.safeParse({
     id: formData.get('id'),
     name: formData.get('name'),
     hourlyRate: formData.get('hourlyRate'),
+    email: formData.get('email'),
   });
 
    if (!validatedFields.success) {

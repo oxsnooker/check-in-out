@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { calculateWorkingHours } from '@/lib/utils';
 import { type State } from '@/lib/actions';
+import useLocalStorage from '@/hooks/use-local-storage';
 
 
 interface SalaryData {
@@ -61,9 +62,9 @@ function VerifyButton() {
 
 export default function SalaryPage() {
   const { toast } = useToast();
-  const [staff] = React.useState<Staff[]>(MOCK_STAFF);
-  const [allAttendance] = React.useState<AttendanceRecord[]>(MOCK_ATTENDANCE);
-  const [allAdvances] = React.useState<AdvancePayment[]>(MOCK_ADVANCES);
+  const [staff] = useLocalStorage<Staff[]>('staff', MOCK_STAFF);
+  const [allAttendance] = useLocalStorage<AttendanceRecord[]>('attendance', MOCK_ATTENDANCE);
+  const [allAdvances] = useLocalStorage<AdvancePayment[]>('advances', MOCK_ADVANCES);
 
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
   const [isVerified, setIsVerified] = React.useState(false);

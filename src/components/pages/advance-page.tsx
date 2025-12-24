@@ -5,6 +5,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import useLocalStorage from '@/hooks/use-local-storage';
 import {
   Card,
   CardContent,
@@ -57,8 +58,8 @@ function VerifyButton() {
 }
 
 export default function AdvancePage() {
-  const [staff] = React.useState<Staff[]>(MOCK_STAFF);
-  const [payments, setPayments] = React.useState<AdvancePayment[]>(MOCK_ADVANCES);
+  const [staff] = useLocalStorage<Staff[]>('staff', MOCK_STAFF);
+  const [payments, setPayments] = useLocalStorage<AdvancePayment[]>('advances', MOCK_ADVANCES);
 
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());

@@ -37,6 +37,7 @@ import type { Staff } from '@/lib/definitions';
 import { MOCK_STAFF } from '@/lib/data';
 import { Edit, Trash2, UserPlus, ShieldCheck } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import useLocalStorage from '@/hooks/use-local-storage';
 
 function AddStaffSubmitButton() {
   const { pending } = useFormStatus();
@@ -74,7 +75,7 @@ export default function AdminPage() {
   const { toast } = useToast();
   const addFormRef = React.useRef<HTMLFormElement>(null);
   
-  const [staff, setStaff] = React.useState<Staff[]>(MOCK_STAFF);
+  const [staff, setStaff] = useLocalStorage<Staff[]>('staff', MOCK_STAFF);
   const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
   const [isEditDialogOpen, setEditDialogOpen] = React.useState(false);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
@@ -130,7 +131,7 @@ export default function AdminPage() {
                     name: formData.get('name') as string,
                     hourlyRate: parseFloat(formData.get('hourlyRate') as string)
                 };
-                setStaff(prev => prev.map(s => s.id === updatedStaff.id ? updatedStaff : s));
+                setStaff(prev => prev.map(s => s.id === updatedStaff.id ? { ...s, ...updatedStaff } : s));
                 toast({ title: 'Success', description: result.message });
                 setEditDialogOpen(false);
             }
@@ -347,6 +348,20 @@ export default function AdminPage() {
                     {updateState.errors?.name && (
                       <p className="text-sm font-medium text-destructive">
                         {updateState.errors.name}
+                      </p>
+                    )}
+                  </div>
+                   <div className="space-y-2">
+                    <Label htmlFor="edit-email">Email</Label>
+                    <Input
+                      id="edit-email"
+                      name="email"
+                      type="email"
+                      defaultValue={selectedStaff.email}
+                    />
+                    {updateState.errors?.email && (
+                      <p className="text-sm font-medium text-destructive">
+                        {updateState.errors.email}
                       </p>
                     )}
                   </div>
