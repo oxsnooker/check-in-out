@@ -16,7 +16,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <SimpleLogin title="TimeTrack Pro" description="Please sign in to continue" />;
+    return <SimpleLogin title="THEOXSNOOKER" description="Please sign in to continue" />;
   }
 
   return <MainLayout>{children}</MainLayout>;

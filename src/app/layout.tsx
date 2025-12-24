@@ -5,7 +5,7 @@ import { FirebaseClientProvider } from '@/firebase';
 import { AuthGate } from '@/components/auth-gate';
 
 export const metadata: Metadata = {
-  title: 'TimeTrack Pro',
+  title: 'THEOXSNOOKER',
   description: 'Manage staff attendance, payments, and salaries efficiently.',
 };
 

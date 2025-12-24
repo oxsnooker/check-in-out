@@ -26,7 +26,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                 </div>
                 <div className="flex flex-col">
                 <span className="text-lg font-semibold tracking-tight text-sidebar-foreground">
-                    TimeTrack Pro
+                    THEOXSNOOKER
                 </span>
                 </div>
             </div>
