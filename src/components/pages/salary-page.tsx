@@ -64,7 +64,7 @@ export default function SalaryPage() {
   const [staff] = useLocalStorage<Staff[]>('staff', []);
   const [allAttendance] = useLocalStorage<AttendanceRecord[]>('attendance', []);
   const [allAdvances] = useLocalStorage<AdvancePayment[]>('advances', []);
-  const [adminPassword] = useLocalStorage<string>('adminPassword', 'password');
+  const [adminPassword] = useLocalStorage<string>('adminPassword', 'Teamox76@');
 
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
   const [isVerified, setIsVerified] = React.useState(false);

@@ -59,7 +59,7 @@ function VerifyButton() {
 export default function AdvancePage() {
   const [staff] = useLocalStorage<Staff[]>('staff', []);
   const [payments, setPayments] = useLocalStorage<AdvancePayment[]>('advances', []);
-  const [adminPassword] = useLocalStorage<string>('adminPassword', 'password');
+  const [adminPassword] = useLocalStorage<string>('adminPassword', 'Teamox76@');
 
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());

@@ -86,7 +86,7 @@ export default function AdminPageClient() {
   const addFormRef = React.useRef<HTMLFormElement>(null);
   
   const [staff, setStaff] = useLocalStorage<Staff[]>('staff', []);
-  const [adminPassword, setAdminPassword] = useLocalStorage<string>('adminPassword', 'password');
+  const [adminPassword, setAdminPassword] = useLocalStorage<string>('adminPassword', 'Teamox76@');
   
   const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
   const [isEditDialogOpen, setEditDialogOpen] = React.useState(false);
