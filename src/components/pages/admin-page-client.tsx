@@ -30,15 +30,15 @@ import {
   DialogTitle,
   DialogClose,
 } from '@/components/ui/dialog';
-import type { Staff } from '@/lib/definitions';
-import { Edit, Trash2, UserPlus, KeyRound } from 'lucide-react';
+import type { Staff, AttendanceRecord, AdvancePayment } from '@/lib/definitions';
+import { Edit, Trash2, UserPlus, KeyRound, DollarSign, Hourglass, Clock } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import {
   addDocumentNonBlocking,
   deleteDocumentNonBlocking,
   updateDocumentNonBlocking,
 } from '@/firebase/non-blocking-updates';
-import { collection, doc } from 'firebase/firestore';
+import { collection, doc, getDocs, query } from 'firebase/firestore';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,6 +50,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { calculateWorkingHours, toDate } from '@/lib/utils';
 
 const ADMIN_PASSWORD = 'faz&aks76@';
 
@@ -73,6 +74,127 @@ function UpdateStaffSubmitButton() {
       {pending ? 'Saving...' : 'Save Changes'}
     </Button>
   );
+}
+
+interface SalaryData {
+    staffId: string;
+    staffName: string;
+    totalHours: number;
+    hourlyRate: number;
+    salaryAmount: number;
+    totalAdvance: number;
+    balance: number;
+}
+
+function SalaryOverview() {
+    const firestore = useFirestore();
+    const [salaryData, setSalaryData] = React.useState<SalaryData[]>([]);
+    const [isLoadingSalaries, setIsLoadingSalaries] = React.useState(true);
+
+    const staffCollRef = useMemoFirebase(
+        () => collection(firestore, 'staff'),
+        [firestore]
+    );
+    const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollRef);
+
+    React.useEffect(() => {
+        if (!staff) return;
+
+        const fetchAllData = async () => {
+            setIsLoadingSalaries(true);
+            const allSalaryData: SalaryData[] = [];
+
+            for (const staffMember of staff) {
+                const attendanceQuery = query(collection(firestore, `staff/${staffMember.id}/attendanceRecords`));
+                const advancesQuery = query(collection(firestore, `staff/${staffMember.id}/advancePayments`));
+
+                const [attendanceSnapshot, advancesSnapshot] = await Promise.all([
+                    getDocs(attendanceQuery),
+                    getDocs(advancesQuery),
+                ]);
+
+                const allAttendance = attendanceSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AttendanceRecord));
+                const allAdvances = advancesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AdvancePayment));
+
+                const totalHours = allAttendance.reduce((acc, record) => {
+                    const hours1 = calculateWorkingHours(toDate(record.timeIn), toDate(record.timeOut));
+                    const hours2 = calculateWorkingHours(toDate(record.timeIn2), toDate(record.timeOut2));
+                    return acc + hours1 + hours2;
+                }, 0);
+
+                const totalAdvance = allAdvances.reduce(
+                    (acc, payment) => acc + payment.amount,
+                    0
+                );
+
+                const salaryAmount = totalHours * staffMember.hourlyRate;
+                const balance = salaryAmount - totalAdvance;
+
+                allSalaryData.push({
+                    staffId: staffMember.id,
+                    staffName: `${staffMember.firstName} ${staffMember.lastName}`,
+                    totalHours,
+                    hourlyRate: staffMember.hourlyRate,
+                    salaryAmount,
+                    totalAdvance,
+                    balance,
+                });
+            }
+            setSalaryData(allSalaryData);
+            setIsLoadingSalaries(false);
+        };
+
+        fetchAllData();
+    }, [staff, firestore]);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Salary Overview</CardTitle>
+                <CardDescription>
+                    A summary of salary details for all staff members.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Total Hours</TableHead>
+                            <TableHead>Gross Salary</TableHead>
+                            <TableHead>Total Advance</TableHead>
+                            <TableHead>Balance Payable</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoadingSalaries ? (
+                            <TableRow>
+                                <TableCell colSpan={5} className="h-24 text-center">
+                                    Loading salaries...
+                                </TableCell>
+                            </TableRow>
+                        ) : salaryData && salaryData.length > 0 ? (
+                            salaryData.map((s) => (
+                                <TableRow key={s.staffId}>
+                                    <TableCell>{s.staffName}</TableCell>
+                                    <TableCell>{s.totalHours.toFixed(2)} hrs</TableCell>
+                                    <TableCell>{s.salaryAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
+                                    <TableCell className="text-red-600">{s.totalAdvance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
+                                    <TableCell className="font-bold">{s.balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={5} className="h-24 text-center">
+                                    No salary data available.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    )
 }
 
 export default function AdminPageClient() {
@@ -206,132 +328,136 @@ export default function AdminPageClient() {
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-1 space-y-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Add New Staff</CardTitle>
-              <CardDescription>
-                Enter the details for a new staff member.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form ref={addFormRef} onSubmit={handleAddStaff} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" name="firstName" placeholder="John" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" name="lastName" placeholder="Doe" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="hourlyRate">Hourly Rate ($)</Label>
-                  <Input
-                    id="hourlyRate"
-                    name="hourlyRate"
-                    type="number"
-                    step="0.01"
-                    placeholder="20.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                  />
-                </div>
-                <AddStaffSubmitButton />
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="space-y-8">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+          <div className="lg:col-span-1 space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Add New Staff</CardTitle>
+                <CardDescription>
+                  Enter the details for a new staff member.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form ref={addFormRef} onSubmit={handleAddStaff} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input id="firstName" name="firstName" placeholder="John" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input id="lastName" name="lastName" placeholder="Doe" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hourlyRate">Hourly Rate ($)</Label>
+                    <Input
+                      id="hourlyRate"
+                      name="hourlyRate"
+                      type="number"
+                      step="0.01"
+                      placeholder="20.00"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      name="password"
+                      type="password"
+                    />
+                  </div>
+                  <AddStaffSubmitButton />
+                </form>
+              </CardContent>
+            </Card>
+          </div>
 
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Staff List</CardTitle>
-              <CardDescription>
-                A list of all current staff members.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Hourly Rate</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoadingStaff ? (
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Staff List</CardTitle>
+                <CardDescription>
+                  A list of all current staff members.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={3} className="h-24 text-center">
-                        Loading staff...
-                      </TableCell>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Hourly Rate</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ) : staff && staff.length > 0 ? (
-                    staff.map((s) => (
-                      <TableRow key={s.id}>
-                        <TableCell>{s.firstName} {s.lastName}</TableCell>
-                        <TableCell>
-                          {s.hourlyRate.toLocaleString('en-US', {
-                            style: 'currency',
-                            currency: 'USD',
-                          })}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditClick(s)}
-                          >
-                            <Edit className="size-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:text-destructive"
-                              >
-                                <Trash2 className="size-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the staff member and all associated data.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(s.id)}>
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoadingStaff ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="h-24 text-center">
+                          Loading staff...
                         </TableCell>
                       </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={3} className="h-24 text-center">
-                        No staff members found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                    ) : staff && staff.length > 0 ? (
+                      staff.map((s) => (
+                        <TableRow key={s.id}>
+                          <TableCell>{s.firstName} {s.lastName}</TableCell>
+                          <TableCell>
+                            {s.hourlyRate.toLocaleString('en-US', {
+                              style: 'currency',
+                              currency: 'USD',
+                            })}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditClick(s)}
+                            >
+                              <Edit className="size-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the staff member and all associated data.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDelete(s.id)}>
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={3} className="h-24 text-center">
+                          No staff members found.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
+        <SalaryOverview />
+        
         {selectedStaff && (
           <Dialog open={isEditDialogOpen} onOpenChange={setEditDialogOpen}>
             <DialogContent>
