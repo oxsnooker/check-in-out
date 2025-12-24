@@ -122,7 +122,6 @@ export default function AdminPageClient() {
             const newStaff: Staff = {
                 id: uuidv4(),
                 name: formData.get('name') as string,
-                email: formData.get('email') as string,
                 hourlyRate: parseFloat(formData.get('hourlyRate') as string)
             };
             setStaff(prev => [...prev, newStaff]);
@@ -261,20 +260,6 @@ export default function AdminPageClient() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="john.doe@example.com"
-                  />
-                  {addState.errors?.email && (
-                    <p className="text-sm font-medium text-destructive">
-                      {addState.errors.email}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="hourlyRate">Hourly Rate ($)</Label>
                   <Input
                     id="hourlyRate"
@@ -356,7 +341,6 @@ export default function AdminPageClient() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
                     <TableHead>Hourly Rate</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -366,7 +350,6 @@ export default function AdminPageClient() {
                     staff.map((s) => (
                       <TableRow key={s.id}>
                         <TableCell>{s.name}</TableCell>
-                        <TableCell>{s.email}</TableCell>
                         <TableCell>
                           {s.hourlyRate.toLocaleString('en-US', {
                             style: 'currency',
@@ -394,7 +377,7 @@ export default function AdminPageClient() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={4} className="h-24 text-center">
+                      <TableCell colSpan={3} className="h-24 text-center">
                         No staff members found.
                       </TableCell>
                     </TableRow>
@@ -427,20 +410,6 @@ export default function AdminPageClient() {
                     {updateState.errors?.name && (
                       <p className="text-sm font-medium text-destructive">
                         {updateState.errors.name}
-                      </p>
-                    )}
-                  </div>
-                   <div className="space-y-2">
-                    <Label htmlFor="edit-email">Email</Label>
-                    <Input
-                      id="edit-email"
-                      name="email"
-                      type="email"
-                      defaultValue={selectedStaff.email}
-                    />
-                    {updateState.errors?.email && (
-                      <p className="text-sm font-medium text-destructive">
-                        {updateState.errors.email}
                       </p>
                     )}
                   </div>

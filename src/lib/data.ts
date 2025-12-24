@@ -1,9 +1,9 @@
 import type { Staff, AttendanceRecord, AdvancePayment } from './definitions';
 
 export const MOCK_STAFF: Staff[] = [
-  { id: '1', name: 'John Doe', hourlyRate: 25, email: 'john.doe@example.com' },
-  { id: '2', name: 'Jane Smith', hourlyRate: 30, email: 'jane.smith@example.com' },
-  { id: '3', name: 'Peter Jones', hourlyRate: 22, email: 'peter.jones@example.com' },
+  { id: '1', name: 'John Doe', hourlyRate: 25 },
+  { id: '2', name: 'Jane Smith', hourlyRate: 30 },
+  { id: '3', name: 'Peter Jones', hourlyRate: 22 },
 ];
 
 export const MOCK_ATTENDANCE: AttendanceRecord[] = [
