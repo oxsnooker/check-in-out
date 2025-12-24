@@ -345,7 +345,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeIn', e.target.value)
                           }
-                          disabled={!isEditing}
+                           disabled={!!timeIn && !isEditing}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -360,7 +360,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeOut', e.target.value)
                           }
-                          disabled={!isEditing}
+                          disabled={!!timeOut && !isEditing}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -375,7 +375,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeIn2', e.target.value)
                           }
-                          disabled={!isEditing}
+                          disabled={!!timeIn2 && !isEditing}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -390,7 +390,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeOut2', e.target.value)
                           }
-                          disabled={!isEditing}
+                          disabled={!!timeOut2 && !isEditing}
                           className="w-[120px]"
                         />
                       </TableCell>
