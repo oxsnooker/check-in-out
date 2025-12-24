@@ -2,12 +2,13 @@
 
 import * as React from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 import {
   useFirestore,
   useCollection,
   useMemoFirebase,
 } from '@/firebase';
-import { collection, query, where, Timestamp } from 'firebase/firestore';
+import { collection, query, where, Timestamp, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 import {
   Card,
@@ -45,6 +46,7 @@ export default function AdvancePage() {
   const [selectedYear, setSelectedYear] = React.useState<number>(
     new Date().getFullYear()
   );
+    const { toast } = useToast();
 
   const firestore = useFirestore();
 
@@ -97,17 +99,60 @@ export default function AdvancePage() {
 
   const paymentsMap = React.useMemo(() => {
     if (!payments) return new Map();
-    const map = new Map<string, AdvancePayment[]>();
+    const map = new Map<string, AdvancePayment>();
     payments.forEach((payment) => {
       const paymentDate = payment.date instanceof Timestamp ? payment.date.toDate() : payment.date;
       const dayKey = format(paymentDate, 'yyyy-MM-dd');
-      if (!map.has(dayKey)) {
-        map.set(dayKey, []);
-      }
-      map.get(dayKey)?.push(payment);
+      map.set(dayKey, payment);
     });
     return map;
   }, [payments]);
+
+  const handleAmountChange = async (day: Date, amountStr: string) => {
+    if (!selectedStaffId) return;
+
+    try {
+        const amount = parseFloat(amountStr);
+        const dayKey = format(day, 'yyyy-MM-dd');
+        const existingPayment = paymentsMap.get(dayKey);
+        const dayId = format(day, 'yyyyMMdd');
+        const paymentRef = doc(firestore, `staff/${selectedStaffId}/advance_payments`, dayId);
+
+        if (isNaN(amount) || amount <= 0) {
+            // If amount is invalid or zero, delete the record if it exists
+            if (existingPayment) {
+                await deleteDoc(paymentRef);
+                toast({ title: 'Success', description: 'Advance payment removed.' });
+            }
+            return;
+        }
+
+        const paymentData = {
+            id: dayId,
+            staffId: selectedStaffId,
+            date: Timestamp.fromDate(day),
+            amount: amount,
+        };
+
+        if (existingPayment) {
+            // Update existing payment
+            await updateDoc(paymentRef, { amount: amount });
+        } else {
+            // Create new payment
+            await setDoc(paymentRef, paymentData);
+        }
+
+        toast({ title: 'Success', description: 'Advance payment saved successfully.' });
+
+    } catch (error) {
+        console.error('Failed to save advance payment:', error);
+        toast({
+            title: 'Error',
+            description: 'Failed to save advance payment.',
+            variant: 'destructive',
+        });
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 gap-8">
@@ -202,28 +247,22 @@ export default function AdvancePage() {
               ) : daysInMonth.length > 0 ? (
                 daysInMonth.map((day) => {
                   const dayKey = format(day, 'yyyy-MM-dd');
-                  const dailyPayments = paymentsMap.get(dayKey);
-
-                  if (dailyPayments && dailyPayments.length > 0) {
-                     return dailyPayments.map((payment, index) => (
-                       <TableRow key={`${payment.id}-${index}`}>
-                         <TableCell>
-                           {index === 0 ? formatDate(day) : ''}
-                         </TableCell>
-                         <TableCell className="text-right">
-                           {payment.amount.toLocaleString('en-US', {
-                             style: 'currency',
-                             currency: 'USD',
-                           })}
-                         </TableCell>
-                       </TableRow>
-                     ));
-                  }
+                  const payment = paymentsMap.get(dayKey);
                   
                   return (
                     <TableRow key={day.toISOString()}>
                       <TableCell>{formatDate(day)}</TableCell>
-                      <TableCell className="text-right">-</TableCell>
+                      <TableCell className="text-right">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          defaultValue={payment?.amount?.toFixed(2) ?? ''}
+                          onBlur={(e) => handleAmountChange(day, e.target.value)}
+                          className="w-[120px] ml-auto text-right"
+                          disabled={!selectedStaffId}
+                        />
+                      </TableCell>
                     </TableRow>
                   );
                 })
