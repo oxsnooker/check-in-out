@@ -153,21 +153,25 @@ export default function AdminPage() {
     }
   }, [verifyState, toast]);
 
-  React.useEffect(() => {
-    if (isVerifiedForDelete && staffToDelete) {
-      handleDelete(staffToDelete.id);
-      setDeleteDialogOpen(false); 
-    }
-  }, [isVerifiedForDelete, staffToDelete]);
-
   const handleDelete = async (staffId: string) => {
     const result = await deleteStaff(staffId);
     toast({
-        title: result.message.startsWith('Database Error') ? 'Error' : 'Success',
+        title: result.success ? 'Success' : 'Error',
         description: result.message,
-        variant: result.message.startsWith('Database Error') ? 'destructive' : 'default',
+        variant: result.success ? 'default' : 'destructive',
     });
+    if (result.success) {
+      setDeleteDialogOpen(false);
+    }
   };
+
+  React.useEffect(() => {
+    if (isVerifiedForDelete && staffToDelete) {
+      handleDelete(staffToDelete.id);
+      // We don't close the dialog here anymore, handleDelete will do it on success
+    }
+  }, [isVerifiedForDelete, staffToDelete]);
+
 
   const handleEditClick = (staffMember: Staff) => {
     setSelectedStaff(staffMember);

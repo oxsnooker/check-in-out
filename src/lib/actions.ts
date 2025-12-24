@@ -164,9 +164,9 @@ export async function updateStaff(prevState: State, formData: FormData) {
   }
 }
 
-export async function deleteStaff(staffId: string) {
+export async function deleteStaff(staffId: string): Promise<{ success: boolean; message: string }> {
     if (!staffId) {
-        return { message: 'Staff ID is required.' };
+        return { success: false, message: 'Staff ID is required.' };
     }
   try {
     const { firestore } = initializeFirebase();
@@ -174,9 +174,9 @@ export async function deleteStaff(staffId: string) {
     // which requires the Admin SDK. For now, we only delete the Firestore doc.
     await deleteDoc(doc(firestore, 'staff', staffId));
     revalidatePath('/admin');
-    return { message: 'Staff member deleted.' };
+    return { success: true, message: 'Staff member deleted.' };
   } catch (e) {
-    return { message: 'Database Error: Failed to delete staff member.' };
+    return { success: false, message: 'Database Error: Failed to delete staff member.' };
   }
 }
 
