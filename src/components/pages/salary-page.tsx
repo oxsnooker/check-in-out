@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import {
   Card,
@@ -34,9 +33,14 @@ import {
   UserSearch,
   ShieldCheck,
 } from 'lucide-react';
-import { calculateWorkingHours } from '@/lib/utils';
-import { type State } from '@/lib/actions';
+import { calculateWorkingHours, toDate } from '@/lib/utils';
 import useLocalStorage from '@/hooks/use-local-storage';
+import {
+  useCollection,
+  useFirestore,
+  useMemoFirebase,
+} from '@/firebase';
+import { collection, query } from 'firebase/firestore';
 
 
 interface SalaryData {
@@ -61,47 +65,50 @@ function VerifyButton() {
 
 export default function SalaryPage() {
   const { toast } = useToast();
-  const [staff] = useLocalStorage<Staff[]>('staff', []);
-  const [allAttendance] = useLocalStorage<AttendanceRecord[]>('attendance', []);
-  const [allAdvances] = useLocalStorage<AdvancePayment[]>('advances', []);
-  const [adminPassword] = useLocalStorage<string>('adminPassword', 'Teamox76@');
+  const firestore = useFirestore();
+  
+  const staffCollRef = useMemoFirebase(
+    () => collection(firestore, 'staff'),
+    [firestore]
+  );
+  const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollRef);
 
+  const [adminPassword] = useLocalStorage<string>('adminPassword', 'Teamox76@');
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
   const [isVerified, setIsVerified] = React.useState(false);
+
+  const attendanceQuery = useMemoFirebase(() => {
+    if (!selectedStaffId) return null;
+    return query(collection(firestore, `staff/${selectedStaffId}/attendanceRecords`));
+  }, [firestore, selectedStaffId]);
+  const { data: allAttendance, isLoading: isLoadingAttendance } = useCollection<AttendanceRecord>(attendanceQuery);
+  
+  const advancesQuery = useMemoFirebase(() => {
+    if (!selectedStaffId) return null;
+    return query(collection(firestore, `staff/${selectedStaffId}/advancePayments`));
+  }, [firestore, selectedStaffId]);
+  const { data: allAdvances, isLoading: isLoadingAdvances } = useCollection<AdvancePayment>(advancesQuery);
   
 
-  const initialState: State = { message: null, errors: {} };
-  const [state, dispatch] = useActionState(handleVerify, initialState);
-
-  async function handleVerify(prevState: State, formData: FormData) {
+  function handleVerify(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
     const password = formData.get('password') as string;
     if (password === adminPassword) {
-        setIsVerified(true);
-        return { message: 'Verification successful.' };
+      setIsVerified(true);
+    } else {
+      setIsVerified(false);
+      toast({
+        title: 'Verification Failed',
+        description: 'Incorrect password.',
+        variant: 'destructive',
+      });
     }
-    setIsVerified(false);
-    return { message: 'Verification failed.', errors: { password: ['Incorrect password.'] } };
   }
-
-  React.useEffect(() => {
-    if (state.message) {
-      if (state.errors && Object.keys(state.errors).length > 0) {
-        toast({
-          title: 'Verification Failed',
-          description: state.message,
-          variant: 'destructive',
-        });
-        setIsVerified(false);
-      } else {
-        // We don't show a success toast here, as the UI will just reveal the content
-        setIsVerified(true);
-      }
-    }
-  }, [state, toast]);
 
   const handleStaffSelection = (staffId: string) => {
     setSelectedStaffId(staffId);
-    setIsVerified(false); // Reset verification when staff changes
+    setIsVerified(false);
   };
 
   const selectedStaffInfo = staff?.find((s) => s.id === selectedStaffId);
@@ -109,15 +116,13 @@ export default function SalaryPage() {
   let salaryData: SalaryData | null = null;
   
   if (selectedStaffId && selectedStaffInfo && allAttendance && allAdvances) {
-    const staffAttendance = allAttendance.filter(a => a.staffId === selectedStaffId);
-    const totalHours = staffAttendance.reduce((acc, record) => {
-        const hours1 = calculateWorkingHours(record.checkIn, record.checkOut);
-        const hours2 = calculateWorkingHours(record.checkIn2, record.checkOut2);
+    const totalHours = allAttendance.reduce((acc, record) => {
+        const hours1 = calculateWorkingHours(toDate(record.checkIn), toDate(record.checkOut));
+        const hours2 = calculateWorkingHours(toDate(record.checkIn2), toDate(record.checkOut2));
         return acc + hours1 + hours2;
     }, 0);
 
-    const staffAdvances = allAdvances.filter(a => a.staffId === selectedStaffId);
-    const totalAdvance = staffAdvances.reduce(
+    const totalAdvance = allAdvances.reduce(
       (acc, payment) => acc + payment.amount,
       0
     );
@@ -135,6 +140,8 @@ export default function SalaryPage() {
       balance,
     };
   }
+  
+  const isLoading = isLoadingStaff || isLoadingAttendance || isLoadingAdvances;
 
   return (
     <div className="space-y-6">
@@ -169,7 +176,7 @@ export default function SalaryPage() {
 
       {selectedStaffId && !isVerified && (
         <Card className="mx-auto max-w-md">
-          <form action={dispatch}>
+          <form onSubmit={handleVerify}>
             <CardHeader>
               <CardTitle>Verify Access</CardTitle>
               <CardDescription>
@@ -186,11 +193,6 @@ export default function SalaryPage() {
                   type="password"
                   required
                 />
-                {state?.errors?.password && (
-                  <p className="text-sm font-medium text-destructive">
-                    {state.errors.password}
-                  </p>
-                )}
               </div>
             </CardContent>
             <CardFooter>
@@ -200,7 +202,7 @@ export default function SalaryPage() {
         </Card>
       )}
 
-      {selectedStaffId && isVerified && !salaryData && (
+      {selectedStaffId && isVerified && isLoading && (
          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/20 p-12 text-center">
           <Hourglass className="size-12 animate-spin text-muted-foreground/50" />
           <h3 className="mt-4 text-lg font-semibold text-muted-foreground">
@@ -212,7 +214,7 @@ export default function SalaryPage() {
         </div>
       )}
 
-      {salaryData && isVerified && (
+      {salaryData && isVerified && !isLoading && (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           <Card key={salaryData.staffId} className="flex flex-col">
             <CardHeader>

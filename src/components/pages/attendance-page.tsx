@@ -1,11 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+} from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { calculateWorkingHours } from '@/lib/utils';
-import useLocalStorage from '@/hooks/use-local-storage';
-
+import { calculateWorkingHours, toDate } from '@/lib/utils';
 import {
   Card,
   CardContent,
@@ -30,18 +33,58 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import type { Staff, AttendanceRecord } from '@/lib/definitions';
-import { MOCK_STAFF, MOCK_ATTENDANCE } from '@/lib/data';
 import { UserSearch } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
+import {
+  useCollection,
+  useFirestore,
+  useMemoFirebase,
+} from '@/firebase';
+import {
+  collection,
+  doc,
+  query,
+  where,
+  Timestamp,
+} from 'firebase/firestore';
+import {
+  setDocumentNonBlocking,
+  updateDocumentNonBlocking,
+} from '@/firebase/non-blocking-updates';
 
 export default function AttendancePage() {
-  const [staff] = useLocalStorage<Staff[]>('staff', MOCK_STAFF);
-  const [records, setRecords] = useLocalStorage<AttendanceRecord[]>('attendance', MOCK_ATTENDANCE);
-  
-  const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear());
+  const firestore = useFirestore();
   const { toast } = useToast();
+
+  const staffCollRef = useMemoFirebase(
+    () => collection(firestore, 'staff'),
+    [firestore]
+  );
+  const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollRef);
+
+  const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(
+    null
+  );
+  const [selectedMonth, setSelectedMonth] = React.useState<number>(
+    new Date().getMonth()
+  );
+  const [selectedYear, setSelectedYear] = React.useState<number>(
+    new Date().getFullYear()
+  );
+
+  const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
+  const monthEndDate = endOfMonth(monthStartDate);
+
+  const attendanceQuery = useMemoFirebase(() => {
+    if (!selectedStaffId) return null;
+    return query(
+      collection(firestore, `staff/${selectedStaffId}/attendanceRecords`),
+      where('checkIn', '>=', monthStartDate),
+      where('checkIn', '<=', monthEndDate)
+    );
+  }, [firestore, selectedStaffId, selectedMonth, selectedYear]);
+
+  const { data: records, isLoading: isLoadingRecords } =
+    useCollection<AttendanceRecord>(attendanceQuery);
 
   const monthOptions = Array.from({ length: 12 }, (_, i) => ({
     value: i,
@@ -51,46 +94,54 @@ export default function AttendancePage() {
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
-  const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
-  const monthEndDate = endOfMonth(monthStartDate);
   const daysInMonth = eachDayOfInterval({
     start: monthStartDate,
     end: monthEndDate,
   });
 
   const attendanceMap = React.useMemo(() => {
-    if (!records || !selectedStaffId) return new Map();
     const map = new Map<string, AttendanceRecord>();
-    records.filter(r => r.staffId === selectedStaffId).forEach((record) => {
-      const dayKey = format(record.checkIn, 'yyyy-MM-dd');
-      map.set(dayKey, record);
+    if (!records) return map;
+    records.forEach((record) => {
+      const checkInDate = toDate(record.checkIn);
+      if (checkInDate) {
+        const dayKey = format(checkInDate, 'yyyy-MM-dd');
+        map.set(dayKey, record);
+      }
     });
     return map;
-  }, [records, selectedStaffId, selectedMonth, selectedYear]);
+  }, [records]);
 
   const handleTimeChange = async (
     day: Date,
     field: 'checkIn' | 'checkOut' | 'checkIn2' | 'checkOut2',
     time: string
   ) => {
+    if (!selectedStaffId) {
+      toast({
+        title: 'Error',
+        description: 'Please select a staff member first.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
       const dayKey = format(day, 'yyyy-MM-dd');
       const existingRecord = attendanceMap.get(dayKey);
+      const attendanceCollRef = collection(
+        firestore,
+        `staff/${selectedStaffId}/attendanceRecords`
+      );
 
-      if (!selectedStaffId) {
-        toast({
-          title: 'Error',
-          description: 'Please select a staff member first.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      if (!time) { // If time is cleared, remove the timestamp
+      if (!time) {
         if (existingRecord) {
-          setRecords(prev => prev.map(r => r.id === existingRecord.id ? { ...r, [field]: undefined } : r));
-          toast({ title: 'Success', description: 'Attendance time cleared.' });
+          const recordDocRef = doc(attendanceCollRef, existingRecord.id);
+          updateDocumentNonBlocking(recordDocRef, { [field]: null });
+          toast({
+            title: 'Success',
+            description: 'Attendance time cleared.',
+          });
         }
         return;
       }
@@ -98,22 +149,20 @@ export default function AttendancePage() {
       const [hours, minutes] = time.split(':');
       const newDateTime = new Date(day);
       newDateTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
-      
-      if (existingRecord) {
-        setRecords(prev => prev.map(r => r.id === existingRecord.id ? {...r, [field]: newDateTime} : r));
-      } else {
-        const newRecord: AttendanceRecord = {
-            id: uuidv4(),
-            staffId: selectedStaffId,
-            checkIn: day, // This needs to be set, but will be overwritten if field is checkIn
-            ...{[field]: newDateTime}
-        };
-        // ensure checkIn is set properly
-        if(field !== 'checkIn') {
-            newRecord.checkIn = day;
-        }
+      const newTimestamp = Timestamp.fromDate(newDateTime);
 
-        setRecords(prev => [...prev, newRecord]);
+      if (existingRecord) {
+        const recordDocRef = doc(attendanceCollRef, existingRecord.id);
+        updateDocumentNonBlocking(recordDocRef, { [field]: newTimestamp });
+      } else {
+        const newRecord = {
+          staffId: selectedStaffId,
+          checkIn: field === 'checkIn' ? newTimestamp : Timestamp.fromDate(day),
+          [field]: newTimestamp,
+        };
+        const recordId = format(day, 'yyyyMMdd');
+        const recordDocRef = doc(attendanceCollRef, recordId);
+        setDocumentNonBlocking(recordDocRef, newRecord, { merge: true });
       }
 
       toast({
@@ -206,7 +255,13 @@ export default function AttendancePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!selectedStaffId ? (
+              {isLoadingStaff || isLoadingRecords ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    Loading...
+                  </TableCell>
+                </TableRow>
+              ) : !selectedStaffId ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
                     <div className="flex flex-col items-center justify-center gap-2">
@@ -220,22 +275,32 @@ export default function AttendancePage() {
               ) : daysInMonth.length > 0 ? (
                 daysInMonth.map((day) => {
                   const record = attendanceMap.get(format(day, 'yyyy-MM-dd'));
-                  const checkInDate = record?.checkIn;
-                  const checkOutDate = record?.checkOut;
-                  const checkIn2Date = record?.checkIn2;
-                  const checkOut2Date = record?.checkOut2;
+                  const checkInDate = toDate(record?.checkIn);
+                  const checkOutDate = toDate(record?.checkOut);
+                  const checkIn2Date = toDate(record?.checkIn2);
+                  const checkOut2Date = toDate(record?.checkOut2);
 
-                  const hours1 = calculateWorkingHours(checkInDate, checkOutDate);
-                  const hours2 = calculateWorkingHours(checkIn2Date, checkOut2Date);
+                  const hours1 = calculateWorkingHours(
+                    checkInDate,
+                    checkOutDate
+                  );
+                  const hours2 = calculateWorkingHours(
+                    checkIn2Date,
+                    checkOut2Date
+                  );
                   const totalHours = hours1 + hours2;
-                  
+
                   return (
                     <TableRow key={day.toISOString()}>
                       <TableCell>{format(day, 'MMM d, yyyy')}</TableCell>
                       <TableCell>
                         <Input
                           type="time"
-                          defaultValue={checkInDate && checkInDate.getFullYear() === day.getFullYear() && checkInDate.getMonth() === day.getMonth() && checkInDate.getDate() === day.getDate() ? format(checkInDate, 'HH:mm') : ''}
+                          defaultValue={
+                            checkInDate
+                              ? format(checkInDate, 'HH:mm')
+                              : ''
+                          }
                           onBlur={(e) =>
                             handleTimeChange(day, 'checkIn', e.target.value)
                           }
@@ -245,7 +310,11 @@ export default function AttendancePage() {
                       <TableCell>
                         <Input
                           type="time"
-                          defaultValue={checkOutDate ? format(checkOutDate, 'HH:mm') : ''}
+                          defaultValue={
+                            checkOutDate
+                              ? format(checkOutDate, 'HH:mm')
+                              : ''
+                          }
                           onBlur={(e) =>
                             handleTimeChange(day, 'checkOut', e.target.value)
                           }
@@ -255,7 +324,11 @@ export default function AttendancePage() {
                       <TableCell>
                         <Input
                           type="time"
-                          defaultValue={checkIn2Date ? format(checkIn2Date, 'HH:mm') : ''}
+                          defaultValue={
+                            checkIn2Date
+                              ? format(checkIn2Date, 'HH:mm')
+                              : ''
+                          }
                           onBlur={(e) =>
                             handleTimeChange(day, 'checkIn2', e.target.value)
                           }
@@ -265,7 +338,11 @@ export default function AttendancePage() {
                       <TableCell>
                         <Input
                           type="time"
-                          defaultValue={checkOut2Date ? format(checkOut2Date, 'HH:mm') : ''}
+                          defaultValue={
+                            checkOut2Date
+                              ? format(checkOut2Date, 'HH:mm')
+                              : ''
+                          }
                           onBlur={(e) =>
                             handleTimeChange(day, 'checkOut2', e.target.value)
                           }

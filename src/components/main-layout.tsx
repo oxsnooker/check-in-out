@@ -10,8 +10,11 @@ import {
 } from '@/components/ui/sidebar';
 import { NavItems } from './nav-items';
 import { TimerIcon } from 'lucide-react';
+import { useUser } from '@/firebase';
+import { UserNav } from './user-nav';
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
+  const { user } = useUser();
   return (
     <SidebarProvider>
       <Sidebar>
@@ -27,6 +30,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                 </span>
                 </div>
             </div>
+            {user && <UserNav user={user} />}
           </div>
         </SidebarHeader>
         <SidebarContent>
