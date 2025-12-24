@@ -5,6 +5,7 @@ export interface Staff {
   firstName: string;
   lastName: string;
   hourlyRate: number;
+  password?: string;
 }
 
 export interface AttendanceRecord {

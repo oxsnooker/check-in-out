@@ -95,6 +95,7 @@ export default function AdminPageClient() {
       firstName: formData.get('firstName') as string,
       lastName: formData.get('lastName') as string,
       hourlyRate: parseFloat(formData.get('hourlyRate') as string),
+      password: formData.get('password') as string,
     };
 
     if (!newStaff.firstName || !newStaff.lastName || newStaff.hourlyRate <= 0) {
@@ -120,6 +121,12 @@ export default function AdminPageClient() {
       lastName: formData.get('lastName') as string,
       hourlyRate: parseFloat(formData.get('hourlyRate') as string),
     };
+
+    const password = formData.get('password') as string;
+    if (password) {
+      updatedStaff.password = password;
+    }
+
 
     if (!updatedStaff.firstName || !updatedStaff.lastName || !updatedStaff.hourlyRate || updatedStaff.hourlyRate <= 0) {
       toast({
@@ -321,7 +328,7 @@ export default function AdminPageClient() {
                       id="edit-password"
                       name="password"
                       type="password"
-                      placeholder="Enter new password"
+                      placeholder="Enter new password (optional)"
                     />
                   </div>
                 </div>

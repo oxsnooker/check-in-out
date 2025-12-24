@@ -25,6 +25,7 @@ import {
   Clock,
   Hourglass,
   UserSearch,
+  KeyRound,
 } from 'lucide-react';
 import { calculateWorkingHours, toDate } from '@/lib/utils';
 import {
@@ -33,6 +34,9 @@ import {
   useMemoFirebase,
 } from '@/firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { Input } from '../ui/input';
+import { Button } from '../ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 
 interface SalaryData {
@@ -47,6 +51,7 @@ interface SalaryData {
 
 export default function SalaryPage() {
   const firestore = useFirestore();
+  const { toast } = useToast();
   
   const staffCollRef = useMemoFirebase(
     () => collection(firestore, 'staff'),
@@ -55,29 +60,50 @@ export default function SalaryPage() {
   const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollRef);
 
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
+  const [passwordInput, setPasswordInput] = React.useState('');
+  const [isVerified, setIsVerified] = React.useState(false);
 
   const attendanceQuery = useMemoFirebase(() => {
-    if (!selectedStaffId) return null;
+    if (!selectedStaffId || !isVerified) return null;
     return query(collection(firestore, `staff/${selectedStaffId}/attendanceRecords`));
-  }, [firestore, selectedStaffId]);
+  }, [firestore, selectedStaffId, isVerified]);
   const { data: allAttendance, isLoading: isLoadingAttendance } = useCollection<AttendanceRecord>(attendanceQuery);
   
   const advancesQuery = useMemoFirebase(() => {
-    if (!selectedStaffId) return null;
+    if (!selectedStaffId || !isVerified) return null;
     return query(collection(firestore, `staff/${selectedStaffId}/advancePayments`));
-  }, [firestore, selectedStaffId]);
+  }, [firestore, selectedStaffId, isVerified]);
   const { data: allAdvances, isLoading: isLoadingAdvances } = useCollection<AdvancePayment>(advancesQuery);
   
 
   const handleStaffSelection = (staffId: string) => {
     setSelectedStaffId(staffId);
+    setIsVerified(false);
+    setPasswordInput('');
+  };
+
+  const handleVerification = () => {
+    const staffMember = staff?.find(s => s.id === selectedStaffId);
+    if (staffMember && staffMember.password === passwordInput) {
+      setIsVerified(true);
+      toast({
+        title: 'Success',
+        description: 'Password verified. Loading salary details.'
+      });
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Incorrect password. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const selectedStaffInfo = staff?.find((s) => s.id === selectedStaffId);
 
   let salaryData: SalaryData | null = null;
   
-  if (selectedStaffId && selectedStaffInfo && allAttendance && allAdvances) {
+  if (selectedStaffId && isVerified && selectedStaffInfo && allAttendance && allAdvances) {
     const totalHours = allAttendance.reduce((acc, record) => {
         const hours1 = calculateWorkingHours(toDate(record.timeIn), toDate(record.timeOut));
         const hours2 = calculateWorkingHours(toDate(record.timeIn2), toDate(record.timeOut2));
@@ -103,7 +129,7 @@ export default function SalaryPage() {
     };
   }
   
-  const isLoading = isLoadingStaff || isLoadingAttendance || isLoadingAdvances;
+  const isLoadingData = (isLoadingAttendance || isLoadingAdvances) && isVerified;
 
   return (
     <div className="space-y-6">
@@ -119,9 +145,10 @@ export default function SalaryPage() {
             <Select
               onValueChange={handleStaffSelection}
               value={selectedStaffId ?? ''}
+              disabled={isLoadingStaff}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select staff" />
+                <SelectValue placeholder={isLoadingStaff ? "Loading staff..." : "Select staff"} />
               </SelectTrigger>
               <SelectContent>
                 {staff &&
@@ -135,8 +162,46 @@ export default function SalaryPage() {
           </div>
         </CardHeader>
       </Card>
+      
+      {!selectedStaffId && (
+        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/20 p-12 text-center">
+          <UserSearch className="size-12 text-muted-foreground/50" />
+          <h3 className="mt-4 text-lg font-semibold text-muted-foreground">
+            No Staff Selected
+          </h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Please select a staff member from the dropdown to view their salary
+            details.
+          </p>
+        </div>
+      )}
 
-      {selectedStaffId && isLoading && (
+      {selectedStaffId && !isVerified && (
+        <Card className="mx-auto max-w-sm">
+          <CardHeader>
+            <CardTitle>Password Required</CardTitle>
+            <CardDescription>Enter the password for {selectedStaffInfo?.firstName} to view salary details.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Input
+                id="staff-password"
+                type="password"
+                placeholder="Staff Password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleVerification()}
+              />
+            </div>
+             <Button onClick={handleVerification} className="w-full">
+              <KeyRound className="mr-2 size-4" />
+              Verify & View
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {isLoadingData && (
          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/20 p-12 text-center">
           <Hourglass className="size-12 animate-spin text-muted-foreground/50" />
           <h3 className="mt-4 text-lg font-semibold text-muted-foreground">
@@ -148,7 +213,7 @@ export default function SalaryPage() {
         </div>
       )}
 
-      {salaryData && !isLoading && (
+      {salaryData && !isLoadingData && isVerified && (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           <Card key={salaryData.staffId} className="flex flex-col">
             <CardHeader>
@@ -211,19 +276,6 @@ export default function SalaryPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
-      )}
-      
-      {!selectedStaffId && (
-        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/20 p-12 text-center">
-          <UserSearch className="size-12 text-muted-foreground/50" />
-          <h3 className="mt-4 text-lg font-semibold text-muted-foreground">
-            No Staff Selected
-          </h3>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Please select a staff member from the dropdown to view their salary
-            details.
-          </p>
         </div>
       )}
     </div>
