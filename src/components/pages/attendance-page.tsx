@@ -359,7 +359,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeIn', e.target.value)
                           }
-                           disabled={isAbsent || (!!timeIn && !isEditing)}
+                           disabled={isAbsent || (!isEditing && !!timeIn)}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -374,7 +374,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeOut', e.target.value)
                           }
-                          disabled={isAbsent || (!!timeOut && !isEditing)}
+                          disabled={isAbsent || (!isEditing && !!timeOut)}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -389,7 +389,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeIn2', e.target.value)
                           }
-                          disabled={isAbsent || !!timeIn2 && !isEditing}
+                          disabled={isAbsent || (!isEditing && !!timeIn2)}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -404,7 +404,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeOut2', e.target.value)
                           }
-                          disabled={isAbsent || !!timeOut2 && !isEditing}
+                          disabled={isAbsent || (!isEditing && !!timeOut2)}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -414,14 +414,20 @@ export default function AttendancePage() {
                         </span>
                       </TableCell>
                        <TableCell className="text-right">
-                        <Button variant={isAbsent ? 'secondary': 'outline'} size="sm" onClick={() => handleAbsentToggle(day, isAbsent)} className='mr-2'>
+                        <Button 
+                          variant={isAbsent ? 'secondary': 'outline'} 
+                          size="sm" 
+                          onClick={() => handleAbsentToggle(day, isAbsent)} 
+                          className='mr-2'
+                          disabled={record !== undefined && !isEditing}
+                        >
                           {isAbsent ? 'Present' : 'Absent'}
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleEditClick(day.toISOString())}
-                          disabled={isEditing || isAbsent}
+                          disabled={isEditing || !record}
                         >
                           <Edit className="size-4" />
                         </Button>
