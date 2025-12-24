@@ -8,7 +8,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the Staff entity."
+          "description": "Unique identifier for the staff member."
         },
         "firstName": {
           "type": "string",
@@ -38,7 +38,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the AttendanceRecord entity."
+          "description": "Unique identifier for the attendance record."
         },
         "staffId": {
           "type": "string",
@@ -46,17 +46,17 @@
         },
         "date": {
           "type": "string",
-          "description": "Date of the attendance record.",
+          "description": "The date of the attendance record.",
           "format": "date-time"
         },
         "timeIn": {
           "type": "string",
-          "description": "Time the staff member clocked in.",
+          "description": "The time the staff member checked in.",
           "format": "date-time"
         },
         "timeOut": {
           "type": "string",
-          "description": "Time the staff member clocked out.",
+          "description": "The time the staff member checked out.",
           "format": "date-time"
         }
       },
@@ -76,7 +76,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the AdvancePayment entity."
+          "description": "Unique identifier for the advance payment."
         },
         "staffId": {
           "type": "string",
@@ -84,12 +84,12 @@
         },
         "date": {
           "type": "string",
-          "description": "Date of the advance payment.",
+          "description": "The date the advance payment was made.",
           "format": "date-time"
         },
         "amount": {
           "type": "number",
-          "description": "Amount of the advance payment."
+          "description": "The amount of the advance payment."
         }
       },
       "required": [
@@ -115,7 +115,7 @@
           "schema": {
             "$ref": "#/backend/entities/Staff"
           },
-          "description": "Stores staff member information.  Allows admins to create, read, update, and delete staff records.",
+          "description": "Stores staff profiles. Only admins can create, read, update, and delete staff profiles.",
           "params": [
             {
               "name": "staffId",
@@ -125,46 +125,62 @@
         }
       },
       {
-        "path": "/staff/{staffId}/attendance_records/{attendanceRecordId}",
+        "path": "/staff/{staffId}/attendanceRecords/{recordId}",
         "definition": {
           "entityName": "AttendanceRecord",
           "schema": {
             "$ref": "#/backend/entities/AttendanceRecord"
           },
-          "description": "Stores attendance records for each staff member.  Allows admins to create, read, update, and delete attendance records.",
+          "description": "Stores attendance records for a specific staff member. Only admins can create, read, update, and delete attendance records.",
           "params": [
             {
               "name": "staffId",
               "description": "The unique identifier of the staff member."
             },
             {
-              "name": "attendanceRecordId",
+              "name": "recordId",
               "description": "The unique identifier of the attendance record."
             }
           ]
         }
       },
       {
-        "path": "/staff/{staffId}/advance_payments/{advancePaymentId}",
+        "path": "/staff/{staffId}/advancePayments/{paymentId}",
         "definition": {
           "entityName": "AdvancePayment",
           "schema": {
             "$ref": "#/backend/entities/AdvancePayment"
           },
-          "description": "Stores advance payment records for each staff member.  Allows admins to create, read, update, and delete advance payment records.",
+          "description": "Stores advance payments for a specific staff member. Only admins can create, read, update, and delete advance payments.",
           "params": [
             {
               "name": "staffId",
               "description": "The unique identifier of the staff member."
             },
             {
-              "name": "advancePaymentId",
-              "description": "The unique identifier of the advance payment record."
+              "name": "paymentId",
+              "description": "The unique identifier of the advance payment."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{uid}",
+        "definition": {
+          "entityName": "adminRole",
+          "schema": {
+            "$ref": "#/backend/entities/Staff"
+          },
+          "description": "Marks a user as an administrator. The existence of a document at this path grants admin privileges.",
+          "params": [
+            {
+              "name": "uid",
+              "description": "The Firebase Auth UID of the administrator."
             }
           ]
         }
       }
     ],
-    "reasoning": "The Firestore data structure is designed to support the TimeTrack Pro application, focusing on attendance tracking, advance payments, and staff management. It follows the principles of Authorization Independence, Structural Segregation, and Access Modeling to ensure security and scalability.\n\nAuthorization Independence is achieved by storing all authorization-relevant data directly within the documents that require access control.  Specifically, since all of the data is only visible to admin, all the collections and subcollection will be stored in a path that allows admin authorization. This avoids the need for `get()` calls in the security rules, enabling atomic operations and simplifying debugging. Since there are no users, there will not be a `members` map for collaborative entities. Thus, admin writes to all the paths.\n\nStructural Segregation is implemented by separating the different types of data into distinct collections: `/staff`, `/staff/{staffId}/attendance_records`, and `/staff/{staffId}/advance_payments`. This segregation ensures that each collection has a homogeneous security posture, simplifying the security rules.\n\nAccess Modeling employs hierarchical paths for user-owned data. Since there are staff members and their attendance records and advance payments, there will be path-based ownership like `/staff/{staffId}/attendance_records/{attendanceRecordId}` and `/staff/{staffId}/advance_payments/{advancePaymentId}`. This structure is highly secure and makes ownership-based security rules simple and efficient.\n\nQAPs (Rules are not Filters) are supported by the structural segregation and authorization independence. `list` operations are secured by enforcing that only admins can read and write data. Because authorization data is denormalized, rules can validate access without additional `get()` calls, preventing rule-based filtering."
+    "reasoning": "The Firestore data structure is designed to support the TimeTrack Pro application, focusing on attendance tracking, advance payments, and staff management. It follows the principles of Authorization Independence, Structural Segregation, and Access Modeling to ensure security and scalability.\n\n1.  **Authorization Independence:** The structure uses path-based ownership for staff-related data (attendance records, advance payments). Each staff member's data is stored under their respective `/staff/{staffId}` document, eliminating the need for `get()` calls in security rules to verify ownership.  The system is designed with the assumption that only admins will have the ability to create, read, update and delete these documents.\n2.  **Structural Segregation:** The `staff` collection stores staff profiles. Attendance records and advance payments are stored in subcollections under each staff document, maintaining a clear separation of data with similar access control requirements.\n3.  **Access Modeling:** Path-based ownership (`/staff/{staffId}/attendanceRecords/{recordId}`, `/staff/{staffId}/advancePayments/{paymentId}`) is used to manage the 1:N relationships between staff and their attendance records/advance payments. This simplifies security rules, allowing easy restriction of access to a staff member's own data. The admin role is managed via the presence of a document in `/roles_admin/{uid}`.  This avoids custom claims.\n\nThis structure facilitates simple, robust, and easily debuggable security rules, aligning with the core design principles."
   }
 }
