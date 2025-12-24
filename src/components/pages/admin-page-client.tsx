@@ -28,11 +28,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
 } from '@/components/ui/dialog';
 import type { Staff } from '@/lib/definitions';
-import { Edit, Trash2, UserPlus } from 'lucide-react';
+import { Edit, Trash2, UserPlus, KeyRound } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import {
   addDocumentNonBlocking,
@@ -51,6 +50,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+
+const ADMIN_PASSWORD = 'faz&aks76@';
 
 function AddStaffSubmitButton() {
   const { pending } = useFormStatus();
@@ -78,6 +79,9 @@ export default function AdminPageClient() {
   const { toast } = useToast();
   const addFormRef = React.useRef<HTMLFormElement>(null);
   const firestore = useFirestore();
+
+  const [isVerified, setIsVerified] = React.useState(false);
+  const [passwordInput, setPasswordInput] = React.useState('');
 
   const staffCollRef = useMemoFirebase(
     () => collection(firestore, 'staff'),
@@ -127,7 +131,6 @@ export default function AdminPageClient() {
       updatedStaff.password = password;
     }
 
-
     if (!updatedStaff.firstName || !updatedStaff.lastName || !updatedStaff.hourlyRate || updatedStaff.hourlyRate <= 0) {
       toast({
         title: 'Error',
@@ -156,6 +159,50 @@ export default function AdminPageClient() {
     setSelectedStaff(staffMember);
     setEditDialogOpen(true);
   };
+
+  const handleVerification = () => {
+    if (passwordInput === ADMIN_PASSWORD) {
+      setIsVerified(true);
+      toast({
+        title: 'Success',
+        description: 'Password verified. Admin panel unlocked.',
+      });
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Incorrect password. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  if (!isVerified) {
+    return (
+      <Card className="mx-auto max-w-sm">
+        <CardHeader>
+          <CardTitle>Admin Access Required</CardTitle>
+          <CardDescription>Enter the admin password to manage staff.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="admin-password">Password</Label>
+            <Input
+              id="admin-password"
+              type="password"
+              placeholder="Admin Password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleVerification()}
+            />
+          </div>
+           <Button onClick={handleVerification} className="w-full">
+            <KeyRound className="mr-2 size-4" />
+            Unlock Admin Panel
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>
