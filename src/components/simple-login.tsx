@@ -16,7 +16,10 @@ import { Label } from './ui/label';
 import { LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from 'firebase/auth';
 
 function LoginSubmitButton() {
   const { pending } = useFormStatus();
@@ -64,22 +67,47 @@ export function SimpleLogin({ title, description }: SimpleLoginProps) {
       let errorMessage = 'An unknown error occurred.';
       switch (error.code) {
         case 'auth/user-not-found':
+          // If user does not exist, try creating a new user.
+          try {
+            await createUserWithEmailAndPassword(auth, email, password);
+            toast({
+              title: 'Account Created',
+              description: 'New admin account created. You are now logged in.',
+            });
+          } catch (creationError: any) {
+             toast({
+              title: 'Sign Up Error',
+              description: creationError.message || 'Could not create account.',
+              variant: 'destructive',
+            });
+          }
+          break;
         case 'auth/wrong-password':
         case 'auth/invalid-credential':
           errorMessage = 'Invalid email or password. Please try again.';
+           toast({
+            title: 'Sign In Error',
+            description: errorMessage,
+            variant: 'destructive',
+          });
           break;
         case 'auth/invalid-email':
           errorMessage = 'Please enter a valid email address.';
+           toast({
+            title: 'Sign In Error',
+            description: errorMessage,
+            variant: 'destructive',
+          });
           break;
         default:
           errorMessage = error.message;
+           toast({
+            title: 'Sign In Error',
+            description: errorMessage,
+            variant: 'destructive',
+          });
           break;
       }
-      toast({
-        title: 'Sign In Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
     }
   };
 
@@ -98,13 +126,14 @@ export function SimpleLogin({ title, description }: SimpleLoginProps) {
                 id="email"
                 name="email"
                 type="email"
-                placeholder="staff@example.com"
+                placeholder="admin@example.com"
                 required
+                defaultValue="admin@example.com"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" name="password" type="password" required />
+              <Input id="password" name="password" type="password" required defaultValue="password" />
             </div>
           </CardContent>
           <CardFooter>
