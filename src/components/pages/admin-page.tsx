@@ -11,6 +11,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,8 +35,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import type { Staff } from '@/lib/definitions';
-import { MOCK_STAFF } from '@/lib/data';
-import { Edit, Trash2, UserPlus, ShieldCheck } from 'lucide-react';
+import { Edit, Trash2, UserPlus, ShieldCheck, Save } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import useLocalStorage from '@/hooks/use-local-storage';
 
@@ -71,16 +71,33 @@ function VerifyButton() {
     );
 }
 
+function ChangePasswordButton() {
+    const { pending } = useFormStatus();
+    return (
+        <Button type="submit" disabled={pending} className="w-full">
+            {pending ? 'Saving...' : 'Save Password'}
+            <Save className="ml-2 size-4" />
+        </Button>
+    );
+}
+
 export default function AdminPage() {
   const { toast } = useToast();
   const addFormRef = React.useRef<HTMLFormElement>(null);
   
-  const [staff, setStaff] = useLocalStorage<Staff[]>('staff', MOCK_STAFF);
+  const [staff, setStaff] = useLocalStorage<Staff[]>('staff', []);
+  const [adminPassword, setAdminPassword] = useLocalStorage<string>('adminPassword', 'password');
+  
   const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
   const [isEditDialogOpen, setEditDialogOpen] = React.useState(false);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [isVerifiedForDelete, setIsVerifiedForDelete] = React.useState(false);
   const [staffToDelete, setStaffToDelete] = React.useState<Staff | null>(null);
+
+  const [currentPassword, setCurrentPassword] = React.useState('');
+  const [newPassword, setNewPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
+
 
   const addInitialState: State = { message: null, errors: {} };
   const [addState, addDispatch] = useActionState(handleAddStaff, addInitialState);
@@ -141,13 +158,33 @@ export default function AdminPage() {
 
   async function handleVerify(prevState: State, formData: FormData) {
     const password = formData.get('password') as string;
-    if (password === 'password') {
+    if (password === adminPassword) {
         setIsVerifiedForDelete(true);
         return { message: 'Verification successful.' };
     }
     return { message: 'Verification failed.', errors: {password: ['Incorrect password.']}};
   }
 
+  const handleChangePassword = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (currentPassword !== adminPassword) {
+      toast({ title: 'Error', description: 'Current password is not correct.', variant: 'destructive' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: 'Error', description: 'New passwords do not match.', variant: 'destructive' });
+      return;
+    }
+    if (newPassword.length < 6) {
+        toast({ title: 'Error', description: 'Password must be at least 6 characters.', variant: 'destructive' });
+        return;
+    }
+    setAdminPassword(newPassword);
+    toast({ title: 'Success', description: 'Admin password updated successfully.' });
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+  };
 
   React.useEffect(() => {
     if (verifyState.message) {
@@ -167,21 +204,25 @@ export default function AdminPage() {
 
   const handleDelete = async (staffId: string) => {
     const result = await deleteStaff(staffId);
-    toast({
-        title: result.success ? 'Success' : 'Error',
-        description: result.message,
-        variant: result.success ? 'default' : 'destructive',
-    });
     if (result.success) {
       setStaff(prev => prev.filter(s => s.id !== staffId));
       setDeleteDialogOpen(false);
+      toast({
+          title: 'Success',
+          description: result.message,
+      });
+    } else {
+        toast({
+            title: 'Error',
+            description: result.message,
+            variant: 'destructive',
+        });
     }
   };
 
   React.useEffect(() => {
     if (isVerifiedForDelete && staffToDelete) {
       handleDelete(staffToDelete.id);
-      // We don't close the dialog here anymore, handleDelete will do it on success
     }
   }, [isVerifiedForDelete, staffToDelete]);
 
@@ -200,7 +241,7 @@ export default function AdminPage() {
   return (
     <>
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-8">
           <Card>
             <CardHeader>
               <CardTitle>Add New Staff</CardTitle>
@@ -261,6 +302,54 @@ export default function AdminPage() {
               </form>
             </CardContent>
           </Card>
+           <Card>
+                <form onSubmit={handleChangePassword}>
+                    <CardHeader>
+                        <CardTitle>Change Admin Password</CardTitle>
+                        <CardDescription>
+                            Update the password used for verifying sensitive actions.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="current-password">Current Password</Label>
+                            <Input
+                                id="current-password"
+                                name="current-password"
+                                type="password"
+                                value={currentPassword}
+                                onChange={(e) => setCurrentPassword(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="new-password">New Password</Label>
+                            <Input
+                                id="new-password"
+                                name="new-password"
+                                type="password"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="confirm-password">Confirm New Password</Label>
+                            <Input
+                                id="confirm-password"
+                                name="confirm-password"
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                required
+                            />
+                        </div>
+                    </CardContent>
+                    <CardFooter>
+                        <ChangePasswordButton />
+                    </CardFooter>
+                </form>
+            </Card>
         </div>
 
         <div className="lg:col-span-2">
@@ -400,12 +489,12 @@ export default function AdminPage() {
                       <DialogHeader>
                           <DialogTitle>Verify Deletion</DialogTitle>
                           <DialogDescription>
-                              To permanently delete {staffToDelete.name}, please enter your password. This action cannot be undone.
+                              To permanently delete {staffToDelete.name}, please enter the admin password. This action cannot be undone.
                           </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4 py-4">
                           <div className="space-y-2">
-                              <Label htmlFor="password">Password</Label>
+                              <Label htmlFor="password">Admin Password</Label>
                               <Input
                               id="password"
                               name="password"

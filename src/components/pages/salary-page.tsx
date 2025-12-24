@@ -27,7 +27,6 @@ import type {
   AttendanceRecord,
   AdvancePayment,
 } from '@/lib/definitions';
-import { MOCK_STAFF, MOCK_ADVANCES, MOCK_ATTENDANCE } from '@/lib/data';
 import {
   DollarSign,
   Clock,
@@ -62,9 +61,10 @@ function VerifyButton() {
 
 export default function SalaryPage() {
   const { toast } = useToast();
-  const [staff] = useLocalStorage<Staff[]>('staff', MOCK_STAFF);
-  const [allAttendance] = useLocalStorage<AttendanceRecord[]>('attendance', MOCK_ATTENDANCE);
-  const [allAdvances] = useLocalStorage<AdvancePayment[]>('advances', MOCK_ADVANCES);
+  const [staff] = useLocalStorage<Staff[]>('staff', []);
+  const [allAttendance] = useLocalStorage<AttendanceRecord[]>('attendance', []);
+  const [allAdvances] = useLocalStorage<AdvancePayment[]>('advances', []);
+  const [adminPassword] = useLocalStorage<string>('adminPassword', 'password');
 
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
   const [isVerified, setIsVerified] = React.useState(false);
@@ -75,7 +75,7 @@ export default function SalaryPage() {
 
   async function handleVerify(prevState: State, formData: FormData) {
     const password = formData.get('password') as string;
-    if (password) { // Mock verification
+    if (password === adminPassword) {
         setIsVerified(true);
         return { message: 'Verification successful.' };
     }
@@ -93,7 +93,7 @@ export default function SalaryPage() {
         });
         setIsVerified(false);
       } else {
-        toast({ title: 'Success', description: state.message });
+        // We don't show a success toast here, as the UI will just reveal the content
         setIsVerified(true);
       }
     }
@@ -174,12 +174,12 @@ export default function SalaryPage() {
               <CardTitle>Verify Access</CardTitle>
               <CardDescription>
                 To view salary details for {selectedStaffInfo?.name}, please
-                enter your password.
+                enter the admin password.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Admin Password</Label>
                 <Input
                   id="password"
                   name="password"

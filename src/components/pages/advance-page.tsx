@@ -29,7 +29,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { Staff, AdvancePayment } from '@/lib/definitions';
-import { MOCK_STAFF, MOCK_ADVANCES } from '@/lib/data';
 import { UserSearch, Trash2, ShieldCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -50,7 +49,7 @@ import { v4 as uuidv4 } from 'uuid';
 function VerifyButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending} className="w-full">
+    <Button type="submit" disabled={pending} className="w-full bg-destructive hover:bg-destructive/90">
       {pending ? 'Verifying...' : 'Verify & Delete'}
       <ShieldCheck className="ml-2 size-4" />
     </Button>
@@ -58,8 +57,9 @@ function VerifyButton() {
 }
 
 export default function AdvancePage() {
-  const [staff] = useLocalStorage<Staff[]>('staff', MOCK_STAFF);
-  const [payments, setPayments] = useLocalStorage<AdvancePayment[]>('advances', MOCK_ADVANCES);
+  const [staff] = useLocalStorage<Staff[]>('staff', []);
+  const [payments, setPayments] = useLocalStorage<AdvancePayment[]>('advances', []);
+  const [adminPassword] = useLocalStorage<string>('adminPassword', 'password');
 
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());
@@ -75,7 +75,7 @@ export default function AdvancePage() {
   
   async function handleVerify(prevState: State, formData: FormData) {
     const password = formData.get('password') as string;
-    if (password === 'password') { // Mock verification
+    if (password === adminPassword) {
         setIsVerified(true);
         return { message: 'Verification successful.' };
     }
@@ -327,12 +327,12 @@ export default function AdvancePage() {
                     <DialogHeader>
                         <DialogTitle>Verify Deletion</DialogTitle>
                          <DialogDescription>
-                            To delete the advance payment of {paymentToDelete.payment.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} for {formatDate(paymentToDelete.day)}, please enter your password.
+                            To delete the advance payment of {paymentToDelete.payment.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} for {formatDate(paymentToDelete.day)}, please enter the admin password.
                         </DialogDescription>
                     </DialogHeader>
                      <div className="space-y-4 py-4">
                         <div className="space-y-2">
-                            <Label htmlFor="password">Password</Label>
+                            <Label htmlFor="password">Admin Password</Label>
                             <Input
                             id="password"
                             name="password"
