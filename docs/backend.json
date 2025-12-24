@@ -58,14 +58,22 @@
           "type": "string",
           "description": "The time the staff member checked out.",
           "format": "date-time"
+        },
+        "timeIn2": {
+          "type": "string",
+          "description": "The time the staff member checked in for the second shift.",
+          "format": "date-time"
+        },
+        "timeOut2": {
+          "type": "string",
+          "description": "The time the staff member checked out for the second shift.",
+          "format": "date-time"
         }
       },
       "required": [
         "id",
         "staffId",
-        "date",
-        "timeIn",
-        "timeOut"
+        "date"
       ]
     },
     "AdvancePayment": {

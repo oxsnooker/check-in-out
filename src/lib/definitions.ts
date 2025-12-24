@@ -10,10 +10,11 @@ export interface Staff {
 export interface AttendanceRecord {
   id: string;
   staffId: string;
-  checkIn: Date | Timestamp;
-  checkOut?: Date | Timestamp;
-  checkIn2?: Date | Timestamp;
-  checkOut2?: Date | Timestamp;
+  date: Date | Timestamp;
+  timeIn?: Date | Timestamp;
+  timeOut?: Date | Timestamp;
+  timeIn2?: Date | Timestamp;
+  timeOut2?: Date | Timestamp;
 }
 
 export interface AdvancePayment {
@@ -22,5 +23,3 @@ export interface AdvancePayment {
   amount: number;
   date: Date | Timestamp;
 }
-
-    

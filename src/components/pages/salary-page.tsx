@@ -32,7 +32,7 @@ import {
   useFirestore,
   useMemoFirebase,
 } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 
 
 interface SalaryData {
@@ -79,8 +79,8 @@ export default function SalaryPage() {
   
   if (selectedStaffId && selectedStaffInfo && allAttendance && allAdvances) {
     const totalHours = allAttendance.reduce((acc, record) => {
-        const hours1 = calculateWorkingHours(toDate(record.checkIn), toDate(record.checkOut));
-        const hours2 = calculateWorkingHours(toDate(record.checkIn2), toDate(record.checkOut2));
+        const hours1 = calculateWorkingHours(toDate(record.timeIn), toDate(record.timeOut));
+        const hours2 = calculateWorkingHours(toDate(record.timeIn2), toDate(record.timeOut2));
         return acc + hours1 + hours2;
     }, 0);
 
