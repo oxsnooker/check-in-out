@@ -26,7 +26,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { Staff, AdvancePayment } from '@/lib/definitions';
-import { UserSearch, Trash2 } from 'lucide-react';
+import { UserSearch, Edit } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,17 +42,16 @@ import {
 } from '@/firebase/non-blocking-updates';
 import { toDate } from '@/lib/utils';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '../ui/label';
 
+const EDIT_PASSWORD = 'Teamox76@';
 
 export default function AdvancePage() {
   const firestore = useFirestore();
@@ -67,6 +66,10 @@ export default function AdvancePage() {
   const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());
   const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear());
   const { toast } = useToast();
+  const [editingRowKey, setEditingRowKey] = React.useState<string | null>(null);
+  const [isVerificationOpen, setVerificationOpen] = React.useState(false);
+  const [rowToEdit, setRowToEdit] = React.useState<string | null>(null);
+  const [passwordInput, setPasswordInput] = React.useState('');
 
   const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
   const monthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
@@ -156,13 +159,32 @@ export default function AdvancePage() {
     }
   };
 
-  const handleDelete = async (paymentId: string) => {
-    if (!selectedStaffId) return;
-    const paymentDocRef = doc(firestore, `staff/${selectedStaffId}/advancePayments`, paymentId);
-    deleteDocumentNonBlocking(paymentDocRef);
-    toast({ title: 'Success', description: 'Advance payment deleted.' });
+  const handleEditClick = (rowKey: string) => {
+    setRowToEdit(rowKey);
+    setVerificationOpen(true);
   };
-  
+
+  const handleVerification = () => {
+    if (passwordInput === EDIT_PASSWORD) {
+      if (rowToEdit) {
+        setEditingRowKey(rowToEdit);
+      }
+      toast({
+        title: 'Success',
+        description: 'Verification successful. You can now edit the amount.',
+      });
+      setVerificationOpen(false);
+      setPasswordInput('');
+      setRowToEdit(null);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Incorrect password. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const selectedStaffMember = staff?.find((s) => s.id === selectedStaffId);
 
   return (
@@ -232,19 +254,20 @@ export default function AdvancePage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead className="text-right w-[200px]">Amount</TableHead>
+                  <TableHead className="w-[200px]">Amount</TableHead>
+                  <TableHead className="text-right w-[80px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoadingStaff || isLoadingPayments ? (
                    <TableRow>
-                    <TableCell colSpan={2} className="h-24 text-center">
+                    <TableCell colSpan={3} className="h-24 text-center">
                         Loading...
                     </TableCell>
                   </TableRow>
                 ) : !selectedStaffId ? (
                   <TableRow>
-                    <TableCell colSpan={2} className="h-24 text-center">
+                    <TableCell colSpan={3} className="h-24 text-center">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <UserSearch className="size-8 text-muted-foreground" />
                         <p className="text-muted-foreground">
@@ -257,11 +280,12 @@ export default function AdvancePage() {
                   daysInMonth.map((day) => {
                     const dayKey = format(day, 'yyyy-MM-dd');
                     const payment = paymentsMap.get(dayKey);
+                    const isEditing = editingRowKey === day.toISOString();
 
                     return (
                       <TableRow key={day.toISOString()}>
                         <TableCell>{format(day, 'MMM d, yyyy')}</TableCell>
-                        <TableCell className="flex items-center justify-end gap-2 text-right">
+                        <TableCell>
                           <Input
                             type="number"
                             step="0.01"
@@ -271,34 +295,19 @@ export default function AdvancePage() {
                               handleAmountChange(day, e.target.value)
                             }
                             className="w-[120px] text-right"
-                            disabled={!selectedStaffId}
+                            disabled={!selectedStaffId || (!!payment && !isEditing)}
                           />
+                        </TableCell>
+                        <TableCell className="text-right">
                           {payment && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-destructive hover:text-destructive"
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the advance payment.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete(payment.id)}>
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditClick(day.toISOString())}
+                              disabled={isEditing}
+                            >
+                              <Edit className="size-4" />
+                            </Button>
                           )}
                         </TableCell>
                       </TableRow>
@@ -306,7 +315,7 @@ export default function AdvancePage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={2} className="h-24 text-center">
+                    <TableCell colSpan={3} className="h-24 text-center">
                       No advance payments found for this staff member.
                     </TableCell>
                   </TableRow>
@@ -316,6 +325,35 @@ export default function AdvancePage() {
           </CardContent>
         </Card>
       </div>
+      <Dialog open={isVerificationOpen} onOpenChange={setVerificationOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enter Password to Edit</DialogTitle>
+            <DialogDescription>
+              Please enter the admin password to make changes to this record.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-4">
+            <Label htmlFor="edit-password">Password</Label>
+            <Input
+              id="edit-password"
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleVerification()}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setVerificationOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleVerification}>Verify & Edit</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
