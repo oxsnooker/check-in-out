@@ -315,6 +315,15 @@ export default function AdminPageClient() {
                       defaultValue={selectedStaff.hourlyRate}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-password">Password</Label>
+                    <Input
+                      id="edit-password"
+                      name="password"
+                      type="password"
+                      placeholder="Enter new password"
+                    />
+                  </div>
                 </div>
                 <DialogFooter>
                   <DialogClose asChild>
