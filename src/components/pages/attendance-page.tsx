@@ -189,7 +189,8 @@ export default function AttendancePage() {
     }
     
     await updateRecord(day, { [field]: newTimestamp, isAbsent: false });
-    setEditingRowKey(null); // Disable editing after a change
+    // Do not disable editing row after a change when not editing
+    // setEditingRowKey(null); // Disable editing after a change
   };
   
   const handleAbsentToggle = async (day: Date, isCurrentlyAbsent: boolean) => {
@@ -389,7 +390,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeIn2', e.target.value)
                           }
-                          disabled={isAbsent || (!isEditing && !!timeIn2)}
+                          disabled={isAbsent || !isEditing}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -404,7 +405,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'timeOut2', e.target.value)
                           }
-                          disabled={isAbsent || (!isEditing && !!timeOut2)}
+                          disabled={isAbsent || !isEditing}
                           className="w-[120px]"
                         />
                       </TableCell>
