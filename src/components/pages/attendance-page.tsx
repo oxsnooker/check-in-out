@@ -4,12 +4,6 @@ import * as React from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { calculateWorkingHours } from '@/lib/utils';
-import {
-  useFirestore,
-  useCollection,
-  useMemoFirebase,
-} from '@/firebase';
-import { collection, query, where, Timestamp, setDoc, doc, updateDoc } from 'firebase/firestore';
 
 import {
   Card,
@@ -35,41 +29,18 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import type { Staff, AttendanceRecord } from '@/lib/definitions';
+import { MOCK_STAFF, MOCK_ATTENDANCE } from '@/lib/data';
 import { UserSearch } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 
 export default function AttendancePage() {
-  const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(
-    null
-  );
-  const [selectedMonth, setSelectedMonth] = React.useState<number>(
-    new Date().getMonth()
-  );
-  const [selectedYear, setSelectedYear] = React.useState<number>(
-    new Date().getFullYear()
-  );
+  const [staff] = React.useState<Staff[]>(MOCK_STAFF);
+  const [records, setRecords] = React.useState<AttendanceRecord[]>(MOCK_ATTENDANCE);
+  
+  const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear());
   const { toast } = useToast();
-  const firestore = useFirestore();
-
-  const staffCollection = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'staff') : null),
-    [firestore]
-  );
-  const { data: staff, isLoading: isLoadingStaff } =
-    useCollection<Staff>(staffCollection);
-
-  const attendanceQuery = useMemoFirebase(() => {
-    if (!firestore || !selectedStaffId) return null;
-    const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
-    const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
-    return query(
-      collection(firestore, `staff/${selectedStaffId}/attendance_records`),
-      where('checkIn', '>=', startDate),
-      where('checkIn', '<=', endDate)
-    );
-  }, [firestore, selectedStaffId, selectedMonth, selectedYear]);
-
-  const { data: records, isLoading: isLoadingRecords } =
-    useCollection<AttendanceRecord>(attendanceQuery);
 
   const monthOptions = Array.from({ length: 12 }, (_, i) => ({
     value: i,
@@ -87,16 +58,14 @@ export default function AttendancePage() {
   });
 
   const attendanceMap = React.useMemo(() => {
-    if (!records) return new Map();
+    if (!records || !selectedStaffId) return new Map();
     const map = new Map<string, AttendanceRecord>();
-    records.forEach((record) => {
-      // Firebase Timestamps need to be converted to JS Dates
-      const checkInDate = record.checkIn instanceof Timestamp ? record.checkIn.toDate() : record.checkIn;
-      const dayKey = format(checkInDate, 'yyyy-MM-dd');
+    records.filter(r => r.staffId === selectedStaffId).forEach((record) => {
+      const dayKey = format(record.checkIn, 'yyyy-MM-dd');
       map.set(dayKey, record);
     });
     return map;
-  }, [records]);
+  }, [records, selectedStaffId, selectedMonth, selectedYear]);
 
   const handleTimeChange = async (
     day: Date,
@@ -113,21 +82,16 @@ export default function AttendancePage() {
       const newDateTime = new Date(day);
       newDateTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
       
-      const dayId = format(day, 'yyyyMMdd');
-
       if (existingRecord) {
-        // Update existing record
-        const recordRef = doc(firestore, `staff/${selectedStaffId}/attendance_records`, existingRecord.id);
-        await updateDoc(recordRef, { [field]: Timestamp.fromDate(newDateTime) });
+        setRecords(prev => prev.map(r => r.id === existingRecord.id ? {...r, [field]: newDateTime} : r));
       } else {
-        // Create new record with a predictable ID based on date
-        const newRecordRef = doc(firestore, `staff/${selectedStaffId}/attendance_records`, dayId);
-        await setDoc(newRecordRef, {
-            id: newRecordRef.id,
+        const newRecord: AttendanceRecord = {
+            id: uuidv4(),
             staffId: selectedStaffId,
-            date: Timestamp.fromDate(day),
-            [field]: Timestamp.fromDate(newDateTime)
-        }, { merge: true });
+            checkIn: field === 'checkIn' ? newDateTime : day,
+            ...(field !== 'checkIn' && {[field]: newDateTime})
+        };
+        setRecords(prev => [...prev, newRecord]);
       }
 
       toast({
@@ -143,13 +107,6 @@ export default function AttendancePage() {
       });
     }
   };
-
-  const toDateSafe = (date: any): Date | null => {
-    if (date instanceof Timestamp) return date.toDate();
-    if (date instanceof Date) return date;
-    return null;
-  }
-
 
   return (
     <div className="grid grid-cols-1 gap-8">
@@ -169,7 +126,6 @@ export default function AttendancePage() {
             <Select
               onValueChange={setSelectedStaffId}
               value={selectedStaffId ?? ''}
-              disabled={isLoadingStaff}
             >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Select staff" />
@@ -228,13 +184,7 @@ export default function AttendancePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoadingRecords ? (
-                <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
-                        Loading records...
-                    </TableCell>
-                </TableRow>
-              ) : !selectedStaffId ? (
+              {!selectedStaffId ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
                     <div className="flex flex-col items-center justify-center gap-2">
@@ -248,10 +198,10 @@ export default function AttendancePage() {
               ) : daysInMonth.length > 0 ? (
                 daysInMonth.map((day) => {
                   const record = attendanceMap.get(format(day, 'yyyy-MM-dd'));
-                  const checkInDate = toDateSafe(record?.checkIn);
-                  const checkOutDate = toDateSafe(record?.checkOut);
-                  const checkIn2Date = toDateSafe(record?.checkIn2);
-                  const checkOut2Date = toDateSafe(record?.checkOut2);
+                  const checkInDate = record?.checkIn;
+                  const checkOutDate = record?.checkOut;
+                  const checkIn2Date = record?.checkIn2;
+                  const checkOut2Date = record?.checkOut2;
 
                   const hours1 = calculateWorkingHours(checkInDate, checkOutDate);
                   const hours2 = calculateWorkingHours(checkIn2Date, checkOut2Date);

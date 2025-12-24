@@ -27,6 +27,7 @@ import type {
   AttendanceRecord,
   AdvancePayment,
 } from '@/lib/definitions';
+import { MOCK_STAFF, MOCK_ADVANCES, MOCK_ATTENDANCE } from '@/lib/data';
 import {
   DollarSign,
   Clock,
@@ -35,14 +36,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { calculateWorkingHours } from '@/lib/utils';
-import { verifyStaffPassword, type State } from '@/lib/actions';
-import {
-  useFirestore,
-  useCollection,
-  useMemoFirebase,
-  useUser
-} from '@/firebase';
-import { collection, query, where, Timestamp, collectionGroup } from 'firebase/firestore';
+import { type State } from '@/lib/actions';
 
 
 interface SalaryData {
@@ -67,40 +61,26 @@ function VerifyButton() {
 
 export default function SalaryPage() {
   const { toast } = useToast();
-  const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(
-    null
-  );
+  const [staff] = React.useState<Staff[]>(MOCK_STAFF);
+  const [allAttendance] = React.useState<AttendanceRecord[]>(MOCK_ATTENDANCE);
+  const [allAdvances] = React.useState<AdvancePayment[]>(MOCK_ADVANCES);
+
+  const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
   const [isVerified, setIsVerified] = React.useState(false);
-  const { user } = useUser();
-  const firestore = useFirestore();
-
-  const staffCollection = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'staff') : null),
-    [firestore]
-  );
-  const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
   
-  const attendanceQuery = useMemoFirebase(() => {
-    if (!firestore || !selectedStaffId || !isVerified) return null;
-    return query(
-      collection(firestore, `staff/${selectedStaffId}/attendance_records`)
-    );
-  }, [firestore, selectedStaffId, isVerified]);
-
-  const { data: allAttendance, isLoading: isLoadingAttendance } = useCollection<AttendanceRecord>(attendanceQuery);
-
-  const advancesQuery = useMemoFirebase(() => {
-    if (!firestore || !selectedStaffId || !isVerified) return null;
-    return query(
-      collection(firestore, `staff/${selectedStaffId}/advance_payments`)
-    );
-  }, [firestore, selectedStaffId, isVerified]);
-
-  const { data: allAdvances, isLoading: isLoadingAdvances } = useCollection<AdvancePayment>(advancesQuery);
-
 
   const initialState: State = { message: null, errors: {} };
-  const [state, dispatch] = useActionState(verifyStaffPassword, initialState);
+  const [state, dispatch] = useActionState(handleVerify, initialState);
+
+  async function handleVerify(prevState: State, formData: FormData) {
+    const password = formData.get('password') as string;
+    if (password) { // Mock verification
+        setIsVerified(true);
+        return { message: 'Verification successful.' };
+    }
+    setIsVerified(false);
+    return { message: 'Verification failed.', errors: { password: ['Incorrect password.'] } };
+  }
 
   React.useEffect(() => {
     if (state.message) {
@@ -126,28 +106,17 @@ export default function SalaryPage() {
   const selectedStaffInfo = staff?.find((s) => s.id === selectedStaffId);
 
   let salaryData: SalaryData | null = null;
-  const isLoadingSalaryData = isLoadingAttendance || isLoadingAdvances;
-
-
+  
   if (selectedStaffId && selectedStaffInfo && allAttendance && allAdvances) {
-     const toDateSafe = (date: any): Date | null => {
-        if (date instanceof Timestamp) return date.toDate();
-        if (date instanceof Date) return date;
-        return null;
-    }
-
-    const totalHours = allAttendance.reduce((acc, record) => {
-        const checkInDate = toDateSafe(record.checkIn);
-        const checkOutDate = toDateSafe(record.checkOut);
-        const checkIn2Date = toDateSafe(record.checkIn2);
-        const checkOut2Date = toDateSafe(record.checkOut2);
-
-        const hours1 = calculateWorkingHours(checkInDate, checkOutDate);
-        const hours2 = calculateWorkingHours(checkIn2Date, checkOut2Date);
+    const staffAttendance = allAttendance.filter(a => a.staffId === selectedStaffId);
+    const totalHours = staffAttendance.reduce((acc, record) => {
+        const hours1 = calculateWorkingHours(record.checkIn, record.checkOut);
+        const hours2 = calculateWorkingHours(record.checkIn2, record.checkOut2);
         return acc + hours1 + hours2;
     }, 0);
 
-    const totalAdvance = allAdvances.reduce(
+    const staffAdvances = allAdvances.filter(a => a.staffId === selectedStaffId);
+    const totalAdvance = staffAdvances.reduce(
       (acc, payment) => acc + payment.amount,
       0
     );
@@ -180,7 +149,6 @@ export default function SalaryPage() {
             <Select
               onValueChange={handleStaffSelection}
               value={selectedStaffId ?? ''}
-              disabled={isLoadingStaff}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select staff" />
@@ -201,7 +169,6 @@ export default function SalaryPage() {
       {selectedStaffId && !isVerified && (
         <Card className="mx-auto max-w-md">
           <form action={dispatch}>
-            <input type="hidden" name="email" value={user?.email || ''} />
             <CardHeader>
               <CardTitle>Verify Access</CardTitle>
               <CardDescription>
@@ -232,7 +199,7 @@ export default function SalaryPage() {
         </Card>
       )}
 
-      {selectedStaffId && isVerified && isLoadingSalaryData && (
+      {selectedStaffId && isVerified && !salaryData && (
          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/20 p-12 text-center">
           <Hourglass className="size-12 animate-spin text-muted-foreground/50" />
           <h3 className="mt-4 text-lg font-semibold text-muted-foreground">
@@ -244,7 +211,7 @@ export default function SalaryPage() {
         </div>
       )}
 
-      {salaryData && isVerified && !isLoadingSalaryData && (
+      {salaryData && isVerified && (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           <Card key={salaryData.staffId} className="flex flex-col">
             <CardHeader>

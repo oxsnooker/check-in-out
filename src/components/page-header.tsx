@@ -1,9 +1,4 @@
-'use client';
-
 import { SidebarTrigger } from './ui/sidebar';
-import { UserNav } from './user-nav';
-import { useUser } from '@/firebase';
-
 
 type PageHeaderProps = {
   title: string;
@@ -12,7 +7,6 @@ type PageHeaderProps = {
 };
 
 export function PageHeader({ title, description, children }: PageHeaderProps) {
-  const { user } = useUser();
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="flex items-center gap-3">
@@ -26,7 +20,6 @@ export function PageHeader({ title, description, children }: PageHeaderProps) {
       </div>
       <div className="flex items-center gap-4">
          {children}
-         {user && <UserNav user={user} className="hidden md:flex" />}
       </div>
     </div>
   );

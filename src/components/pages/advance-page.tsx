@@ -5,23 +5,10 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import {
-  collection,
-  query,
-  where,
-  Timestamp,
-  doc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-} from 'firebase/firestore';
-
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -41,6 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { Staff, AdvancePayment } from '@/lib/definitions';
+import { MOCK_STAFF, MOCK_ADVANCES } from '@/lib/data';
 import { UserSearch, Trash2, ShieldCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,10 +40,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
 } from '@/components/ui/dialog';
-import { verifyStaffPassword, type State } from '@/lib/actions';
+import { type State } from '@/lib/actions';
+import { v4 as uuidv4 } from 'uuid';
+
 
 function VerifyButton() {
   const { pending } = useFormStatus();
@@ -68,47 +57,30 @@ function VerifyButton() {
 }
 
 export default function AdvancePage() {
-  const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(
-    null
-  );
-  const [selectedMonth, setSelectedMonth] = React.useState<number>(
-    new Date().getMonth()
-  );
-  const [selectedYear, setSelectedYear] = React.useState<number>(
-    new Date().getFullYear()
-  );
-  const { toast } = useToast();
-  const { user } = useUser();
-  const firestore = useFirestore();
+  const [staff] = React.useState<Staff[]>(MOCK_STAFF);
+  const [payments, setPayments] = React.useState<AdvancePayment[]>(MOCK_ADVANCES);
 
-  // State for delete confirmation
+  const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear());
+  const { toast } = useToast();
+
   const [isDeleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [isVerified, setIsVerified] = React.useState(false);
   const [paymentToDelete, setPaymentToDelete] = React.useState<{ day: Date, payment: AdvancePayment } | null>(null);
 
-  const staffCollection = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'staff') : null),
-    [firestore]
-  );
-  const { data: staff, isLoading: isLoadingStaff } =
-    useCollection<Staff>(staffCollection);
-
-  const paymentsQuery = useMemoFirebase(() => {
-    if (!firestore || !selectedStaffId) return null;
-    const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
-    const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
-    return query(
-      collection(firestore, `staff/${selectedStaffId}/advance_payments`),
-      where('date', '>=', startDate),
-      where('date', '<=', endDate)
-    );
-  }, [firestore, selectedStaffId, selectedMonth, selectedYear]);
-
-  const { data: payments, isLoading: isLoadingPayments } =
-    useCollection<AdvancePayment>(paymentsQuery);
-
   const initialState: State = { message: null, errors: {} };
-  const [state, dispatch] = useActionState(verifyStaffPassword, initialState);
+  const [state, dispatch] = useActionState(handleVerify, initialState);
+  
+  async function handleVerify(prevState: State, formData: FormData) {
+    const password = formData.get('password') as string;
+    if (password) { // Mock verification
+        setIsVerified(true);
+        return { message: 'Verification successful.' };
+    }
+    setIsVerified(false);
+    return { message: 'Verification failed.', errors: { password: ['Incorrect password.'] } };
+  }
 
   React.useEffect(() => {
     if (state.message) {
@@ -127,10 +99,9 @@ export default function AdvancePage() {
   }, [state, toast]);
 
   React.useEffect(() => {
-    // If verification is successful and there's a payment to delete, proceed.
     if (isVerified && paymentToDelete) {
-      handleDelete(paymentToDelete.day);
-      setDeleteDialogOpen(false); // Close dialog after successful delete
+      handleDelete(paymentToDelete.payment.id);
+      setDeleteDialogOpen(false);
     }
   }, [isVerified, paymentToDelete]);
 
@@ -143,14 +114,8 @@ export default function AdvancePage() {
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
-  const formatDate = (date: any) => {
-    if (date instanceof Timestamp) {
-      return format(date.toDate(), 'MMM d, yyyy');
-    }
-    if (date instanceof Date) {
-      return format(date, 'MMM d, yyyy');
-    }
-    return 'Invalid Date';
+  const formatDate = (date: Date) => {
+    return format(date, 'MMM d, yyyy');
   };
 
   const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
@@ -161,16 +126,14 @@ export default function AdvancePage() {
   });
 
   const paymentsMap = React.useMemo(() => {
-    if (!payments) return new Map();
+    if (!payments || !selectedStaffId) return new Map();
     const map = new Map<string, AdvancePayment>();
-    payments.forEach((payment) => {
-      const paymentDate =
-        payment.date instanceof Timestamp ? payment.date.toDate() : payment.date;
-      const dayKey = format(paymentDate, 'yyyy-MM-dd');
+    payments.filter(p => p.staffId === selectedStaffId).forEach((payment) => {
+      const dayKey = format(payment.date, 'yyyy-MM-dd');
       map.set(dayKey, payment);
     });
     return map;
-  }, [payments]);
+  }, [payments, selectedStaffId, selectedMonth, selectedYear]);
 
   const handleAmountChange = async (day: Date, amountStr: string) => {
     if (!selectedStaffId) return;
@@ -179,35 +142,25 @@ export default function AdvancePage() {
       const amount = parseFloat(amountStr);
       const dayKey = format(day, 'yyyy-MM-dd');
       const existingPayment = paymentsMap.get(dayKey);
-      const dayId = format(day, 'yyyyMMdd');
-      const paymentRef = doc(
-        firestore,
-        `staff/${selectedStaffId}/advance_payments`,
-        dayId
-      );
 
       if (isNaN(amount) || amount <= 0) {
-        // If amount is invalid or zero, delete the record if it exists
         if (existingPayment) {
-          await deleteDoc(paymentRef);
-          toast({ title: 'Success', description: 'Advance payment removed.' });
+            setPayments(prev => prev.filter(p => p.id !== existingPayment.id));
+            toast({ title: 'Success', description: 'Advance payment removed.' });
         }
         return;
       }
 
-      const paymentData = {
-        id: dayId,
-        staffId: selectedStaffId,
-        date: Timestamp.fromDate(day),
-        amount: amount,
-      };
-
       if (existingPayment) {
-        // Update existing payment
-        await updateDoc(paymentRef, { amount: amount });
+        setPayments(prev => prev.map(p => p.id === existingPayment.id ? {...p, amount} : p));
       } else {
-        // Create new payment
-        await setDoc(paymentRef, paymentData);
+        const newPayment: AdvancePayment = {
+            id: uuidv4(),
+            staffId: selectedStaffId,
+            date: day,
+            amount: amount,
+        };
+        setPayments(prev => [...prev, newPayment]);
       }
 
       toast({
@@ -224,22 +177,9 @@ export default function AdvancePage() {
     }
   };
 
-  const handleDelete = async (day: Date) => {
-    if (!selectedStaffId) return;
-
-    try {
-        const dayId = format(day, 'yyyyMMdd');
-        const paymentRef = doc(firestore, `staff/${selectedStaffId}/advance_payments`, dayId);
-        await deleteDoc(paymentRef);
-        toast({ title: 'Success', description: 'Advance payment deleted.' });
-    } catch (error) {
-        console.error('Failed to delete advance payment:', error);
-        toast({
-            title: 'Error',
-            description: 'Failed to delete advance payment.',
-            variant: 'destructive',
-        });
-    }
+  const handleDelete = async (paymentId: string) => {
+    setPayments(prev => prev.filter(p => p.id !== paymentId));
+    toast({ title: 'Success', description: 'Advance payment deleted.' });
   };
   
   const openDeleteDialog = (day: Date, payment: AdvancePayment) => {
@@ -267,7 +207,6 @@ export default function AdvancePage() {
               <Select
                 onValueChange={setSelectedStaffId}
                 value={selectedStaffId ?? ''}
-                disabled={isLoadingStaff}
               >
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Select staff" />
@@ -322,13 +261,7 @@ export default function AdvancePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoadingPayments ? (
-                  <TableRow>
-                    <TableCell colSpan={2} className="h-24 text-center">
-                      Loading payments...
-                    </TableCell>
-                  </TableRow>
-                ) : !selectedStaffId ? (
+                {!selectedStaffId ? (
                   <TableRow>
                     <TableCell colSpan={2} className="h-24 text-center">
                       <div className="flex flex-col items-center justify-center gap-2">
@@ -390,7 +323,6 @@ export default function AdvancePage() {
         <Dialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
             <DialogContent>
                  <form action={dispatch}>
-                    <input type="hidden" name="email" value={user?.email || ''} />
                     <DialogHeader>
                         <DialogTitle>Verify Deletion</DialogTitle>
                          <DialogDescription>

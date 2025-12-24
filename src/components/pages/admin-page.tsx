@@ -3,13 +3,7 @@
 import * as React from 'react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import {
-  addStaff,
-  updateStaff,
-  deleteStaff,
-  verifyStaffPassword,
-  type State,
-} from '@/lib/actions';
+import { addStaff, updateStaff, deleteStaff, type State } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
 import {
   Card,
@@ -40,9 +34,9 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import type { Staff } from '@/lib/definitions';
+import { MOCK_STAFF } from '@/lib/data';
 import { Edit, Trash2, UserPlus, ShieldCheck } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { v4 as uuidv4 } from 'uuid';
 
 function AddStaffSubmitButton() {
   const { pending } = useFormStatus();
@@ -78,64 +72,82 @@ function VerifyButton() {
 
 export default function AdminPage() {
   const { toast } = useToast();
-  const { user } = useUser();
   const addFormRef = React.useRef<HTMLFormElement>(null);
+  
+  const [staff, setStaff] = React.useState<Staff[]>(MOCK_STAFF);
   const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
   const [isEditDialogOpen, setEditDialogOpen] = React.useState(false);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [isVerifiedForDelete, setIsVerifiedForDelete] = React.useState(false);
   const [staffToDelete, setStaffToDelete] = React.useState<Staff | null>(null);
 
-
-  const firestore = useFirestore();
-  const staffCollection = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'staff') : null),
-    [firestore]
-  );
-  const { data: staff, isLoading } = useCollection<Staff>(staffCollection);
-
   const addInitialState: State = { message: null, errors: {} };
-  const [addState, addDispatch] = useActionState(addStaff, addInitialState);
+  const [addState, addDispatch] = useActionState(handleAddStaff, addInitialState);
 
   const updateInitialState: State = { message: null, errors: {} };
-  const [updateState, updateDispatch] = useActionState(
-    updateStaff,
-    updateInitialState
-  );
-
+  const [updateState, updateDispatch] = useActionState(handleUpdateStaff, updateInitialState);
+  
   const verifyInitialState: State = { message: null, errors: {} };
-  const [verifyState, verifyDispatch] = useActionState(verifyStaffPassword, verifyInitialState);
+  const [verifyState, verifyDispatch] = useActionState(handleVerify, verifyInitialState);
 
 
-  React.useEffect(() => {
-    if (addState.message) {
-      if (addState.errors && Object.keys(addState.errors).length > 0) {
-        toast({
-          title: 'Error',
-          description: addState.message,
-          variant: 'destructive',
-        });
-      } else {
-        toast({ title: 'Success', description: addState.message });
-        addFormRef.current?.reset();
+  async function handleAddStaff(prevState: State, formData: FormData) {
+      const result = await addStaff(prevState, formData);
+      if (result.message) {
+        if(result.errors && Object.keys(result.errors).length > 0){
+             toast({
+                title: 'Error',
+                description: result.message,
+                variant: 'destructive',
+            });
+        } else {
+            const newStaff: Staff = {
+                id: uuidv4(),
+                name: formData.get('name') as string,
+                email: formData.get('email') as string,
+                hourlyRate: parseFloat(formData.get('hourlyRate') as string)
+            };
+            setStaff(prev => [...prev, newStaff]);
+            toast({ title: 'Success', description: result.message });
+            addFormRef.current?.reset();
+        }
       }
-    }
-  }, [addState, toast]);
+      return result;
+  }
+  
+  async function handleUpdateStaff(prevState: State, formData: FormData) {
+      const result = await updateStaff(prevState, formData);
+       if (result.message) {
+            if (result.errors && Object.keys(result.errors).length > 0) {
+                toast({
+                    title: 'Error',
+                    description: result.message,
+                    variant: 'destructive',
+                });
+            } else {
+                const updatedStaff: Staff = {
+                    id: formData.get('id') as string,
+                    name: formData.get('name') as string,
+                    hourlyRate: parseFloat(formData.get('hourlyRate') as string)
+                };
+                setStaff(prev => prev.map(s => s.id === updatedStaff.id ? updatedStaff : s));
+                toast({ title: 'Success', description: result.message });
+                setEditDialogOpen(false);
+            }
+        }
+        return result;
+  }
 
-  React.useEffect(() => {
-    if (updateState.message) {
-      if (updateState.errors && Object.keys(updateState.errors).length > 0) {
-        toast({
-          title: 'Error',
-          description: updateState.message,
-          variant: 'destructive',
-        });
-      } else {
-        toast({ title: 'Success', description: updateState.message });
-        setEditDialogOpen(false);
-      }
+  async function handleVerify(prevState: State, formData: FormData) {
+    // This is a mock verification. In a real app, it would check a password.
+    const password = formData.get('password') as string;
+    if (password) {
+        setIsVerifiedForDelete(true);
+        return { message: 'Verification successful.' };
     }
-  }, [updateState, toast]);
+    return { message: 'Verification failed.', errors: {password: ['Incorrect password']}};
+  }
+
 
   React.useEffect(() => {
     if (verifyState.message) {
@@ -161,6 +173,7 @@ export default function AdminPage() {
         variant: result.success ? 'default' : 'destructive',
     });
     if (result.success) {
+      setStaff(prev => prev.filter(s => s.id !== staffId));
       setDeleteDialogOpen(false);
     }
   };
@@ -269,13 +282,7 @@ export default function AdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="h-24 text-center">
-                        Loading staff...
-                      </TableCell>
-                    </TableRow>
-                  ) : staff && staff.length > 0 ? (
+                  {staff && staff.length > 0 ? (
                     staff.map((s) => (
                       <TableRow key={s.id}>
                         <TableCell>{s.name}</TableCell>
@@ -376,7 +383,6 @@ export default function AdminPage() {
           <Dialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
               <DialogContent>
                   <form action={verifyDispatch}>
-                      <input type="hidden" name="email" value={user?.email || ''} />
                       <DialogHeader>
                           <DialogTitle>Verify Deletion</DialogTitle>
                           <DialogDescription>
