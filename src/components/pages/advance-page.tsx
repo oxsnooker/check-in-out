@@ -1,10 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useFormStatus } from 'react-dom';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import useLocalStorage from '@/hooks/use-local-storage';
 import {
   Card,
   CardContent,
@@ -28,19 +26,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { Staff, AdvancePayment } from '@/lib/definitions';
-import { UserSearch, Trash2, ShieldCheck } from 'lucide-react';
+import { UserSearch, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from '@/components/ui/dialog';
 import {
   useCollection,
   useFirestore,
@@ -53,20 +41,18 @@ import {
   setDocumentNonBlocking,
 } from '@/firebase/non-blocking-updates';
 import { toDate } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
-function VerifyButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button
-      type="submit"
-      disabled={pending}
-      className="bg-destructive hover:bg-destructive/90"
-    >
-      {pending ? 'Verifying...' : 'Verify & Delete'}
-      <ShieldCheck className="ml-2 size-4" />
-    </Button>
-  );
-}
 
 export default function AdvancePage() {
   const firestore = useFirestore();
@@ -77,14 +63,10 @@ export default function AdvancePage() {
   );
   const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollRef);
   
-  const [adminPassword] = useLocalStorage<string>('adminPassword', 'Teamox76@');
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());
   const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear());
   const { toast } = useToast();
-
-  const [isDeleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
-  const [paymentToDelete, setPaymentToDelete] = React.useState<AdvancePayment | null>(null);
 
   const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
   const monthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
@@ -99,26 +81,6 @@ export default function AdvancePage() {
   }, [firestore, selectedStaffId, selectedMonth, selectedYear]);
   
   const { data: payments, isLoading: isLoadingPayments } = useCollection<AdvancePayment>(advancesQuery);
-
-  function handleVerify(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const password = formData.get('password') as string;
-    if (password === adminPassword) {
-        toast({ title: 'Success', description: 'Verification successful. Deleting payment...' });
-        if(paymentToDelete) {
-            handleDelete(paymentToDelete.id);
-        }
-        setDeleteDialogOpen(false);
-        setPaymentToDelete(null);
-    } else {
-      toast({
-        title: 'Verification Failed',
-        description: 'Incorrect password.',
-        variant: 'destructive',
-      });
-    }
-  }
 
   const monthOptions = Array.from({ length: 12 }, (_, i) => ({
     value: i,
@@ -201,11 +163,6 @@ export default function AdvancePage() {
     toast({ title: 'Success', description: 'Advance payment deleted.' });
   };
   
-  const openDeleteDialog = (payment: AdvancePayment) => {
-    setPaymentToDelete(payment);
-    setDeleteDialogOpen(true);
-  }
-
   const selectedStaffMember = staff?.find((s) => s.id === selectedStaffId);
 
   return (
@@ -317,14 +274,31 @@ export default function AdvancePage() {
                             disabled={!selectedStaffId}
                           />
                           {payment && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => openDeleteDialog(payment)}
-                              >
-                                <Trash2 className="size-4" />
-                              </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the advance payment.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDelete(payment.id)}>
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           )}
                         </TableCell>
                       </TableRow>
@@ -342,42 +316,6 @@ export default function AdvancePage() {
           </CardContent>
         </Card>
       </div>
-
-       {paymentToDelete && selectedStaffMember &&(
-        <Dialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-            <DialogContent>
-                 <form onSubmit={handleVerify}>
-                    <DialogHeader>
-                        <DialogTitle>Verify Deletion</DialogTitle>
-                         <DialogDescription>
-                            To delete the advance payment of {paymentToDelete.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} for {selectedStaffMember.firstName} {selectedStaffMember.lastName} on {paymentToDelete.date && toDate(paymentToDelete.date) ? format(toDate(paymentToDelete.date)!, 'MMM d, yyyy') : ''}, please enter the admin password.
-                        </DialogDescription>
-                    </DialogHeader>
-                     <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="password">Admin Password</Label>
-                            <Input
-                            id="password"
-                            name="password"
-                            type="password"
-                            required
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                       <DialogClose asChild>
-                         <Button type="button" variant="secondary">
-                            Cancel
-                        </Button>
-                       </DialogClose>
-                       <VerifyButton />
-                    </DialogFooter>
-                 </form>
-            </DialogContent>
-        </Dialog>
-       )}
     </>
   );
 }
-
-    

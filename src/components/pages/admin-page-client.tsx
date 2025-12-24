@@ -9,7 +9,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,9 +32,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import type { Staff } from '@/lib/definitions';
-import { Edit, Trash2, UserPlus, ShieldCheck, Save } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
-import useLocalStorage from '@/hooks/use-local-storage';
+import { Edit, Trash2, UserPlus } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import {
   addDocumentNonBlocking,
@@ -43,6 +40,17 @@ import {
   updateDocumentNonBlocking,
 } from '@/firebase/non-blocking-updates';
 import { collection, doc } from 'firebase/firestore';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 function AddStaffSubmitButton() {
   const { pending } = useFormStatus();
@@ -66,30 +74,6 @@ function UpdateStaffSubmitButton() {
   );
 }
 
-function VerifyButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button
-      type="submit"
-      disabled={pending}
-      className="bg-destructive hover:bg-destructive/90"
-    >
-      {pending ? 'Verifying...' : 'Verify & Delete'}
-      <ShieldCheck className="ml-2 size-4" />
-    </Button>
-  );
-}
-
-function ChangePasswordButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={pending} className="w-full">
-      {pending ? 'Saving...' : 'Save Password'}
-      <Save className="ml-2 size-4" />
-    </Button>
-  );
-}
-
 export default function AdminPageClient() {
   const { toast } = useToast();
   const addFormRef = React.useRef<HTMLFormElement>(null);
@@ -101,20 +85,9 @@ export default function AdminPageClient() {
   );
   const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollRef);
 
-  const [adminPassword, setAdminPassword] = useLocalStorage<string>(
-    'adminPassword',
-    'Teamox76@'
-  );
-
   const [selectedStaff, setSelectedStaff] = React.useState<Staff | null>(null);
   const [isEditDialogOpen, setEditDialogOpen] = React.useState(false);
-  const [isDeleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
-  const [staffToDelete, setStaffToDelete] = React.useState<Staff | null>(null);
-
-  const [currentPassword, setCurrentPassword] = React.useState('');
-  const [newPassword, setNewPassword] = React.useState('');
-  const [confirmPassword, setConfirmPassword] = React.useState('');
-
+  
   async function handleAddStaff(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
@@ -163,59 +136,6 @@ export default function AdminPageClient() {
     setEditDialogOpen(false);
   }
 
-  function handleVerify(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const password = formData.get('password') as string;
-    if (password === adminPassword) {
-      toast({ title: 'Success', description: 'Verification successful. Deleting staff...' });
-      if (staffToDelete) {
-        handleDelete(staffToDelete.id);
-      }
-      setDeleteDialogOpen(false); 
-      setStaffToDelete(null);
-    } else {
-      toast({
-        title: 'Verification Failed',
-        description: 'Incorrect password.',
-        variant: 'destructive',
-      });
-    }
-  }
-
-  const handleChangePassword = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (currentPassword !== adminPassword) {
-      toast({
-        title: 'Error',
-        description: 'Current password is not correct.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: 'Error',
-        description: 'New passwords do not match.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    if (newPassword.length < 6) {
-      toast({
-        title: 'Error',
-        description: 'Password must be at least 6 characters.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    setAdminPassword(newPassword);
-    toast({ title: 'Success', description: 'Admin password updated successfully.' });
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-  };
-
   const handleDelete = async (staffId: string) => {
     const staffDocRef = doc(firestore, 'staff', staffId);
     deleteDocumentNonBlocking(staffDocRef);
@@ -228,11 +148,6 @@ export default function AdminPageClient() {
   const handleEditClick = (staffMember: Staff) => {
     setSelectedStaff(staffMember);
     setEditDialogOpen(true);
-  };
-
-  const openDeleteDialog = (staffMember: Staff) => {
-    setStaffToDelete(staffMember);
-    setDeleteDialogOpen(true);
   };
 
   return (
@@ -269,54 +184,6 @@ export default function AdminPageClient() {
                 <AddStaffSubmitButton />
               </form>
             </CardContent>
-          </Card>
-          <Card>
-            <form onSubmit={handleChangePassword}>
-              <CardHeader>
-                <CardTitle>Change Admin Password</CardTitle>
-                <CardDescription>
-                  Update the password used for verifying sensitive actions.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="current-password">Current Password</Label>
-                  <Input
-                    id="current-password"
-                    name="current-password"
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-password">New Password</Label>
-                  <Input
-                    id="new-password"
-                    name="new-password"
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirm New Password</Label>
-                  <Input
-                    id="confirm-password"
-                    name="confirm-password"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                  />
-                </div>
-              </CardContent>
-              <CardFooter>
-                <ChangePasswordButton />
-              </CardFooter>
-            </form>
           </Card>
         </div>
 
@@ -362,14 +229,31 @@ export default function AdminPageClient() {
                           >
                             <Edit className="size-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => openDeleteDialog(s)}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete the staff member and all associated data.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(s.id)}>
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </TableCell>
                       </TableRow>
                     ))
@@ -436,39 +320,7 @@ export default function AdminPageClient() {
             </DialogContent>
           </Dialog>
         )}
-
-        {staffToDelete && (
-          <Dialog open={isDeleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-            <DialogContent>
-              <form onSubmit={handleVerify}>
-                <DialogHeader>
-                  <DialogTitle>Verify Deletion</DialogTitle>
-                  <DialogDescription>
-                    To permanently delete {staffToDelete.firstName} {staffToDelete.lastName}, please enter
-                    the admin password. This action cannot be undone.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Admin Password</Label>
-                    <Input id="password" name="password" type="password" required />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button type="button" variant="secondary">
-                      Cancel
-                    </Button>
-                  </DialogClose>
-                  <VerifyButton />
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        )}
       </div>
     </>
   );
 }
-
-    
