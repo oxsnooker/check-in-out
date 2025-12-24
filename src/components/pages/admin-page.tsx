@@ -140,13 +140,12 @@ export default function AdminPage() {
   }
 
   async function handleVerify(prevState: State, formData: FormData) {
-    // This is a mock verification. In a real app, it would check a password.
     const password = formData.get('password') as string;
-    if (password) {
+    if (password === 'password') {
         setIsVerifiedForDelete(true);
         return { message: 'Verification successful.' };
     }
-    return { message: 'Verification failed.', errors: {password: ['Incorrect password']}};
+    return { message: 'Verification failed.', errors: {password: ['Incorrect password.']}};
   }
 
 

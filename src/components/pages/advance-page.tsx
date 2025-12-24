@@ -75,7 +75,7 @@ export default function AdvancePage() {
   
   async function handleVerify(prevState: State, formData: FormData) {
     const password = formData.get('password') as string;
-    if (password) { // Mock verification
+    if (password === 'password') { // Mock verification
         setIsVerified(true);
         return { message: 'Verification successful.' };
     }
