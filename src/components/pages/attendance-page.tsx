@@ -304,6 +304,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'checkIn', e.target.value)
                           }
+                          disabled={!!checkInDate}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -318,6 +319,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'checkOut', e.target.value)
                           }
+                          disabled={!!checkOutDate}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -332,6 +334,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'checkIn2', e.target.value)
                           }
+                          disabled={!!checkIn2Date}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -346,6 +349,7 @@ export default function AttendancePage() {
                           onBlur={(e) =>
                             handleTimeChange(day, 'checkOut2', e.target.value)
                           }
+                          disabled={!!checkOut2Date}
                           className="w-[120px]"
                         />
                       </TableCell>
@@ -372,5 +376,3 @@ export default function AttendancePage() {
     </div>
   );
 }
-
-    
