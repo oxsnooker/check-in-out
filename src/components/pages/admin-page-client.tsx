@@ -61,6 +61,7 @@ import {
 } from '../ui/select';
 
 const ADMIN_PASSWORD = 'faz&aks76@';
+const STAFF_MANAGEMENT_PASSWORD = 'Faz&aks76@';
 
 function AddStaffSubmitButton() {
   const { pending } = useFormStatus();
@@ -260,6 +261,9 @@ export default function AdminPageClient() {
 
   const [isVerified, setIsVerified] = React.useState(false);
   const [passwordInput, setPasswordInput] = React.useState('');
+  
+  const [isStaffManagementUnlocked, setIsStaffManagementUnlocked] = React.useState(false);
+  const [staffManagementPasswordInput, setStaffManagementPasswordInput] = React.useState('');
 
   const staffCollRef = useMemoFirebase(
     () => collection(firestore, 'staff'),
@@ -354,6 +358,22 @@ export default function AdminPageClient() {
     }
   };
 
+  const handleStaffManagementVerification = () => {
+    if (staffManagementPasswordInput === STAFF_MANAGEMENT_PASSWORD) {
+      setIsStaffManagementUnlocked(true);
+      toast({
+        title: 'Success',
+        description: 'Staff management unlocked.',
+      });
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Incorrect password for staff management.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (!isVerified) {
     return (
       <Card className="mx-auto max-w-sm">
@@ -385,132 +405,158 @@ export default function AdminPageClient() {
   return (
     <>
       <div className="space-y-8">
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          <div className="lg:col-span-1 space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Add New Staff</CardTitle>
-                <CardDescription>
-                  Enter the details for a new staff member.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form ref={addFormRef} onSubmit={handleAddStaff} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input id="firstName" name="firstName" placeholder="John" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input id="lastName" name="lastName" placeholder="Doe" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="hourlyRate">Hourly Rate ($)</Label>
-                    <Input
-                      id="hourlyRate"
-                      name="hourlyRate"
-                      type="number"
-                      step="0.01"
-                      placeholder="20.00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      name="password"
-                      type="password"
-                    />
-                  </div>
-                  <AddStaffSubmitButton />
-                </form>
-              </CardContent>
-            </Card>
-          </div>
+        {!isStaffManagementUnlocked ? (
+          <Card className="mx-auto max-w-sm">
+            <CardHeader>
+              <CardTitle>Staff Management Access</CardTitle>
+              <CardDescription>Enter the password to add, edit, or remove staff.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="staff-management-password">Password</Label>
+                <Input
+                  id="staff-management-password"
+                  type="password"
+                  placeholder="Staff Management Password"
+                  value={staffManagementPasswordInput}
+                  onChange={(e) => setStaffManagementPasswordInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleStaffManagementVerification()}
+                />
+              </div>
+               <Button onClick={handleStaffManagementVerification} className="w-full">
+                <KeyRound className="mr-2 size-4" />
+                Unlock Staff Management
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+            <div className="lg:col-span-1 space-y-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Add New Staff</CardTitle>
+                  <CardDescription>
+                    Enter the details for a new staff member.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form ref={addFormRef} onSubmit={handleAddStaff} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName">First Name</Label>
+                      <Input id="firstName" name="firstName" placeholder="John" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName">Last Name</Label>
+                      <Input id="lastName" name="lastName" placeholder="Doe" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="hourlyRate">Hourly Rate ($)</Label>
+                      <Input
+                        id="hourlyRate"
+                        name="hourlyRate"
+                        type="number"
+                        step="0.01"
+                        placeholder="20.00"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        name="password"
+                        type="password"
+                      />
+                    </div>
+                    <AddStaffSubmitButton />
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
 
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Staff List</CardTitle>
-                <CardDescription>
-                  A list of all current staff members.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Hourly Rate</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoadingStaff ? (
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Staff List</CardTitle>
+                  <CardDescription>
+                    A list of all current staff members.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={3} className="h-24 text-center">
-                          Loading staff...
-                        </TableCell>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Hourly Rate</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    ) : staff && staff.length > 0 ? (
-                      staff.map((s) => (
-                        <TableRow key={s.id}>
-                          <TableCell>{s.firstName} {s.lastName}</TableCell>
-                          <TableCell>
-                            {s.hourlyRate.toLocaleString('en-US', {
-                              style: 'currency',
-                              currency: 'USD',
-                            })}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEditClick(s)}
-                            >
-                              <Edit className="size-4" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-destructive hover:text-destructive"
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the staff member and all associated data.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete(s.id)}>
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                    </TableHeader>
+                    <TableBody>
+                      {isLoadingStaff ? (
+                        <TableRow>
+                          <TableCell colSpan={3} className="h-24 text-center">
+                            Loading staff...
                           </TableCell>
                         </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={3} className="h-24 text-center">
-                          No staff members found.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                      ) : staff && staff.length > 0 ? (
+                        staff.map((s) => (
+                          <TableRow key={s.id}>
+                            <TableCell>{s.firstName} {s.lastName}</TableCell>
+                            <TableCell>
+                              {s.hourlyRate.toLocaleString('en-US', {
+                                style: 'currency',
+                                currency: 'USD',
+                              })}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEditClick(s)}
+                              >
+                                <Edit className="size-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This action cannot be undone. This will permanently delete the staff member and all associated data.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(s.id)}>
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={3} className="h-24 text-center">
+                            No staff members found.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
+        )}
 
         <SalaryOverview />
         
