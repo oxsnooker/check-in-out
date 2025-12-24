@@ -48,12 +48,11 @@ export type State = {
 };
 
 export async function addStaff(prevState: State, formData: FormData) {
-  const AddStaffSchema = FormSchema.pick({ name: true, hourlyRate: true, email: true, password: true });
+  const AddStaffSchema = FormSchema.pick({ name: true, hourlyRate: true, email: true });
   const validatedFields = AddStaffSchema.safeParse({
     name: formData.get('name'),
     hourlyRate: formData.get('hourlyRate'),
     email: formData.get('email'),
-    password: formData.get('password'),
   });
 
   if (!validatedFields.success) {

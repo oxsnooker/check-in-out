@@ -275,15 +275,6 @@ export default function AdminPageClient() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input id="password" name="password" type="password" />
-                  {addState.errors?.password && (
-                    <p className="text-sm font-medium text-destructive">
-                      {addState.errors.password}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="hourlyRate">Hourly Rate ($)</Label>
                   <Input
                     id="hourlyRate"
