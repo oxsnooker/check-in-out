@@ -235,9 +235,9 @@ function SalaryOverview() {
                                 <TableRow key={s.staffId}>
                                     <TableCell>{s.staffName}</TableCell>
                                     <TableCell>{s.totalHours.toFixed(2)} hrs</TableCell>
-                                    <TableCell>{s.salaryAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
-                                    <TableCell className="text-red-600">{s.totalAdvance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
-                                    <TableCell className="font-bold">{s.balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</TableCell>
+                                    <TableCell>{s.salaryAmount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</TableCell>
+                                    <TableCell className="text-red-600">{s.totalAdvance.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</TableCell>
+                                    <TableCell className="font-bold">{s.balance.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</TableCell>
                                 </TableRow>
                             ))
                         ) : (
@@ -450,13 +450,13 @@ export default function AdminPageClient() {
                       <Input id="lastName" name="lastName" placeholder="Doe" />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="hourlyRate">Hourly Rate ($)</Label>
+                      <Label htmlFor="hourlyRate">Hourly Rate (₹)</Label>
                       <Input
                         id="hourlyRate"
                         name="hourlyRate"
                         type="number"
                         step="0.01"
-                        placeholder="20.00"
+                        placeholder="150.00"
                       />
                     </div>
                     <div className="space-y-2">
@@ -502,9 +502,9 @@ export default function AdminPageClient() {
                           <TableRow key={s.id}>
                             <TableCell>{s.firstName} {s.lastName}</TableCell>
                             <TableCell>
-                              {s.hourlyRate.toLocaleString('en-US', {
+                              {s.hourlyRate.toLocaleString('en-IN', {
                                 style: 'currency',
-                                currency: 'USD',
+                                currency: 'INR',
                               })}
                             </TableCell>
                             <TableCell className="text-right">
@@ -588,7 +588,7 @@ export default function AdminPageClient() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-hourlyRate">Hourly Rate ($)</Label>
+                    <Label htmlFor="edit-hourlyRate">Hourly Rate (₹)</Label>
                     <Input
                       id="edit-hourlyRate"
                       name="hourlyRate"

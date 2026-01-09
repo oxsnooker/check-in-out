@@ -290,9 +290,9 @@ export default function SalaryPage() {
                   Hourly Rate
                 </span>
                 <span className="font-medium">
-                  {salaryData.hourlyRate.toLocaleString('en-US', {
+                  {salaryData.hourlyRate.toLocaleString('en-IN', {
                     style: 'currency',
-                    currency: 'USD',
+                    currency: 'INR',
                   })}
                 </span>
               </div>
@@ -302,9 +302,9 @@ export default function SalaryPage() {
                   Gross Salary
                 </span>
                 <span className="font-medium text-green-600">
-                  {salaryData.salaryAmount.toLocaleString('en-US', {
+                  {salaryData.salaryAmount.toLocaleString('en-IN', {
                     style: 'currency',
-                    currency: 'USD',
+                    currency: 'INR',
                   })}
                 </span>
               </div>
@@ -314,18 +314,18 @@ export default function SalaryPage() {
                   Total Advance
                 </span>
                 <span className="font-medium text-red-600">
-                  {salaryData.totalAdvance.toLocaleString('en-US', {
+                  {salaryData.totalAdvance.toLocaleString('en-IN', {
                     style: 'currency',
-                    currency: 'USD',
+                    currency: 'INR',
                   })}
                 </span>
               </div>
               <div className="flex items-center justify-between pt-2">
                 <span className="font-semibold">Balance Payable</span>
                 <span className="text-xl font-bold text-primary">
-                  {salaryData.balance.toLocaleString('en-US', {
+                  {salaryData.balance.toLocaleString('en-IN', {
                     style: 'currency',
-                    currency: 'USD',
+                    currency: 'INR',
                   })}
                 </span>
               </div>
