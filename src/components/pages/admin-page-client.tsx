@@ -99,8 +99,14 @@ function SalaryOverview() {
     const firestore = useFirestore();
     const [salaryData, setSalaryData] = React.useState<SalaryData[]>([]);
     const [isLoadingSalaries, setIsLoadingSalaries] = React.useState(true);
-    const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());
-    const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear());
+    const [selectedMonth, setSelectedMonth] = React.useState<number | null>(null);
+    const [selectedYear, setSelectedYear] = React.useState<number | null>(null);
+    
+    React.useEffect(() => {
+        const currentDate = new Date();
+        setSelectedMonth(currentDate.getMonth());
+        setSelectedYear(currentDate.getFullYear());
+    }, []);
 
     const staffCollRef = useMemoFirebase(
         () => collection(firestore, 'staff'),
@@ -117,7 +123,7 @@ function SalaryOverview() {
     const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
     React.useEffect(() => {
-        if (!staff) return;
+        if (!staff || selectedMonth === null || selectedYear === null) return;
 
         const fetchAllData = async () => {
             setIsLoadingSalaries(true);
@@ -169,6 +175,37 @@ function SalaryOverview() {
 
         fetchAllData();
     }, [staff, firestore, selectedMonth, selectedYear]);
+    
+    if (selectedMonth === null || selectedYear === null) {
+        return (
+             <Card>
+                <CardHeader>
+                    <CardTitle>Salary Overview</CardTitle>
+                    <CardDescription>Loading...</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Total Hours</TableHead>
+                                <TableHead>Gross Salary</TableHead>
+                                <TableHead>Total Advance</TableHead>
+                                <TableHead>Balance Payable</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow>
+                                <TableCell colSpan={5} className="h-24 text-center">
+                                    Initializing...
+                                </TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </CardContent>
+             </Card>
+        )
+    }
 
     return (
         <Card>

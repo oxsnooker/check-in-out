@@ -63,23 +63,29 @@ export default function AdvancePage() {
   const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollRef);
   
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = React.useState<number | null>(null);
+  const [selectedYear, setSelectedYear] = React.useState<number | null>(null);
   const { toast } = useToast();
   const [editingRowKey, setEditingRowKey] = React.useState<string | null>(null);
   const [isVerificationOpen, setVerificationOpen] = React.useState(false);
   const [rowToEdit, setRowToEdit] = React.useState<string | null>(null);
   const [passwordInput, setPasswordInput] = React.useState('');
 
-  const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
-  const monthEndDate = endOfMonth(new Date(selectedYear, selectedMonth));
+  React.useEffect(() => {
+    const currentDate = new Date();
+    setSelectedMonth(currentDate.getMonth());
+    setSelectedYear(currentDate.getFullYear());
+  }, []);
+
+  const monthStartDate = selectedYear !== null && selectedMonth !== null ? startOfMonth(new Date(selectedYear, selectedMonth)) : new Date();
+  const monthEndDate = selectedYear !== null && selectedMonth !== null ? endOfMonth(new Date(selectedYear, selectedMonth)) : new Date();
 
   const advancesQuery = useMemoFirebase(() => {
-    if (!selectedStaffId) return null;
+    if (!selectedStaffId || selectedMonth === null || selectedYear === null) return null;
     return query(
       collection(firestore, `staff/${selectedStaffId}/advancePayments`),
-      where('date', '>=', monthStartDate),
-      where('date', '<=', monthEndDate)
+      where('date', '>=', startOfMonth(new Date(selectedYear, selectedMonth))),
+      where('date', '<=', endOfMonth(new Date(selectedYear, selectedMonth)))
     );
   }, [firestore, selectedStaffId, selectedMonth, selectedYear]);
   
@@ -93,10 +99,10 @@ export default function AdvancePage() {
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
-  const daysInMonth = eachDayOfInterval({
+  const daysInMonth = selectedYear !== null && selectedMonth !== null ? eachDayOfInterval({
     start: monthStartDate,
     end: monthEndDate,
-  });
+  }) : [];
 
   const paymentsMap = React.useMemo(() => {
     const map = new Map<string, AdvancePayment>();
@@ -186,6 +192,20 @@ export default function AdvancePage() {
   };
 
   const selectedStaffMember = staff?.find((s) => s.id === selectedStaffId);
+
+  if (selectedMonth === null || selectedYear === null) {
+      return (
+           <Card>
+              <CardHeader>
+                  <CardTitle>Payment History</CardTitle>
+                  <CardDescription>Loading...</CardDescription>
+              </CardHeader>
+              <CardContent className="h-96 flex items-center justify-center">
+                  <p>Initializing...</p>
+              </CardContent>
+           </Card>
+      )
+  }
 
   return (
     <>

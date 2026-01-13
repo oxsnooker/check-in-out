@@ -76,27 +76,29 @@ export default function AttendancePage() {
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(
     null
   );
-  const [selectedMonth, setSelectedMonth] = React.useState<number>(
-    new Date().getMonth()
-  );
-  const [selectedYear, setSelectedYear] = React.useState<number>(
-    new Date().getFullYear()
-  );
+  const [selectedMonth, setSelectedMonth] = React.useState<number | null>(null);
+  const [selectedYear, setSelectedYear] = React.useState<number | null>(null);
   const [editingRowKey, setEditingRowKey] = React.useState<string | null>(null);
   const [isVerificationOpen, setVerificationOpen] = React.useState(false);
   const [rowToEdit, setRowToEdit] = React.useState<string | null>(null);
   const [passwordInput, setPasswordInput] = React.useState('');
 
+  React.useEffect(() => {
+    const currentDate = new Date();
+    setSelectedMonth(currentDate.getMonth());
+    setSelectedYear(currentDate.getFullYear());
+  }, []);
 
-  const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
-  const monthEndDate = endOfMonth(monthStartDate);
+
+  const monthStartDate = selectedYear !== null && selectedMonth !== null ? startOfMonth(new Date(selectedYear, selectedMonth)) : new Date();
+  const monthEndDate = selectedYear !== null && selectedMonth !== null ? endOfMonth(new Date(selectedYear, selectedMonth)) : new Date();
 
   const attendanceQuery = useMemoFirebase(() => {
-    if (!selectedStaffId) return null;
+    if (!selectedStaffId || selectedMonth === null || selectedYear === null) return null;
     return query(
       collection(firestore, `staff/${selectedStaffId}/attendanceRecords`),
-      where('date', '>=', monthStartDate),
-      where('date', '<=', monthEndDate)
+      where('date', '>=', startOfMonth(new Date(selectedYear, selectedMonth))),
+      where('date', '<=', endOfMonth(new Date(selectedYear, selectedMonth)))
     );
   }, [firestore, selectedStaffId, selectedMonth, selectedYear]);
 
@@ -111,10 +113,10 @@ export default function AttendancePage() {
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
-  const daysInMonth = eachDayOfInterval({
+  const daysInMonth = selectedYear !== null && selectedMonth !== null ? eachDayOfInterval({
     start: monthStartDate,
     end: monthEndDate,
-  });
+  }) : [];
 
   const attendanceMap = React.useMemo(() => {
     const map = new Map<string, AttendanceRecord>();
@@ -231,6 +233,20 @@ export default function AttendancePage() {
   };
 
   const selectedStaffMember = staff?.find((s) => s.id === selectedStaffId);
+
+  if (selectedMonth === null || selectedYear === null) {
+      return (
+           <Card>
+              <CardHeader>
+                  <CardTitle>Attendance History</CardTitle>
+                  <CardDescription>Loading...</CardDescription>
+              </CardHeader>
+              <CardContent className="h-96 flex items-center justify-center">
+                  <p>Initializing...</p>
+              </CardContent>
+           </Card>
+      )
+  }
 
   return (
     <>

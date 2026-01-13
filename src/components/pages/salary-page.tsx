@@ -63,28 +63,34 @@ export default function SalaryPage() {
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
   const [passwordInput, setPasswordInput] = React.useState('');
   const [isVerified, setIsVerified] = React.useState(false);
-  const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = React.useState<number | null>(null);
+  const [selectedYear, setSelectedYear] = React.useState<number | null>(null);
 
-  const monthStartDate = startOfMonth(new Date(selectedYear, selectedMonth));
-  const monthEndDate = endOfMonth(monthStartDate);
+  React.useEffect(() => {
+    const currentDate = new Date();
+    setSelectedMonth(currentDate.getMonth());
+    setSelectedYear(currentDate.getFullYear());
+  }, []);
+
+  const monthStartDate = selectedYear !== null && selectedMonth !== null ? startOfMonth(new Date(selectedYear, selectedMonth)) : new Date();
+  const monthEndDate = selectedYear !== null && selectedMonth !== null ? endOfMonth(new Date(selectedYear, selectedMonth)) : new Date();
 
   const attendanceQuery = useMemoFirebase(() => {
-    if (!selectedStaffId || !isVerified) return null;
+    if (!selectedStaffId || !isVerified || selectedMonth === null || selectedYear === null) return null;
     return query(
       collection(firestore, `staff/${selectedStaffId}/attendanceRecords`),
-      where('date', '>=', monthStartDate),
-      where('date', '<=', monthEndDate)
+      where('date', '>=', startOfMonth(new Date(selectedYear, selectedMonth))),
+      where('date', '<=', endOfMonth(new Date(selectedYear, selectedMonth)))
     );
   }, [firestore, selectedStaffId, isVerified, selectedMonth, selectedYear]);
   const { data: allAttendance, isLoading: isLoadingAttendance } = useCollection<AttendanceRecord>(attendanceQuery);
   
   const advancesQuery = useMemoFirebase(() => {
-    if (!selectedStaffId || !isVerified) return null;
+    if (!selectedStaffId || !isVerified || selectedMonth === null || selectedYear === null) return null;
     return query(
       collection(firestore, `staff/${selectedStaffId}/advancePayments`),
-      where('date', '>=', monthStartDate),
-      where('date', '<=', monthEndDate)
+      where('date', '>=', startOfMonth(new Date(selectedYear, selectedMonth))),
+      where('date', '<=', endOfMonth(new Date(selectedYear, selectedMonth)))
     );
   }, [firestore, selectedStaffId, isVerified, selectedMonth, selectedYear]);
   const { data: allAdvances, isLoading: isLoadingAdvances } = useCollection<AdvancePayment>(advancesQuery);
@@ -152,6 +158,17 @@ export default function SalaryPage() {
   }
   
   const isLoadingData = (isLoadingAttendance || isLoadingAdvances) && isVerified;
+
+  if (selectedMonth === null || selectedYear === null) {
+      return (
+          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/20 p-12 text-center">
+              <Hourglass className="size-12 animate-spin text-muted-foreground/50" />
+              <h3 className="mt-4 text-lg font-semibold text-muted-foreground">
+                Initializing...
+              </h3>
+          </div>
+      );
+  }
 
   return (
     <div className="space-y-6">
