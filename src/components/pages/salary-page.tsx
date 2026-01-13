@@ -63,14 +63,8 @@ export default function SalaryPage() {
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null);
   const [passwordInput, setPasswordInput] = React.useState('');
   const [isVerified, setIsVerified] = React.useState(false);
-  const [selectedMonth, setSelectedMonth] = React.useState<number | null>(null);
-  const [selectedYear, setSelectedYear] = React.useState<number | null>(null);
-
-  React.useEffect(() => {
-    const currentDate = new Date();
-    setSelectedMonth(currentDate.getMonth());
-    setSelectedYear(currentDate.getFullYear());
-  }, []);
+  const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear());
 
   const monthStartDate = selectedYear !== null && selectedMonth !== null ? startOfMonth(new Date(selectedYear, selectedMonth)) : new Date();
   const monthEndDate = selectedYear !== null && selectedMonth !== null ? endOfMonth(new Date(selectedYear, selectedMonth)) : new Date();
@@ -299,18 +293,6 @@ export default function SalaryPage() {
                 </span>
                 <span className="font-medium">
                   {salaryData.totalHours.toFixed(2)} hrs
-                </span>
-              </div>
-              <div className="flex items-center justify-between border-b pb-2">
-                <span className="flex items-center gap-2 text-muted-foreground">
-                  <Clock className="size-4" />
-                  Hourly Rate
-                </span>
-                <span className="font-medium">
-                  {salaryData.hourlyRate.toLocaleString('en-IN', {
-                    style: 'currency',
-                    currency: 'INR',
-                  })}
                 </span>
               </div>
               <div className="flex items-center justify-between border-b pb-2">
